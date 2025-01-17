@@ -1,0 +1,32 @@
+{
+    "isFavorite": false,
+    "items": [
+        {
+            "coin": "CYTX",
+            "pool_ssl": false,
+            "dpool_ssl": false,
+            "miner": "lolminer",
+            "miner_config": {
+                "url": "127.0.0.1:5555",
+                "algo": "CYTXHASH",
+                "worker": "%WORKER_NAME%",
+                "user_config": "--disable-cpu"
+            },
+            "pool_geo": []
+        },
+        {
+            "coin": "CYTX",
+            "pool_ssl": false,
+            "dpool_ssl": false,
+            "miner": "custom",
+            "miner_alt": "cytx_bridge",
+            "miner_config": {
+                "url": "YOUR_CRYPTIXD_NODE_IP_HERE:19201",
+                "miner": "cytx_bridge",
+                "template": "doesnt.matter",
+                "install_url": "https://github.com/cryptix-network/cryptix-stratum-bridge-v3/releases/download/v1.1.2/cytx_bridge-1.1.2_hive.tar.gz"
+            },
+            "pool_geo": []
+        }
+    ]
+}
