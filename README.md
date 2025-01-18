@@ -1,10 +1,22 @@
 # Cryptix Stratum Adapter
 
-This is a [forked](https://github.com/cryptix-network/cryptix-stratum-bridge-v3) lightweight daemon that allows mining to a local (or remote) cryptix node using stratum-base miners.
 
-This daemon is confirmed working with the miners below in both dual-mining and cryptix-only modes (for those that support it) and Windows/MacOs/Linux/HiveOs.
-* [lolminer](https://github.com/Lolliedieb/lolMiner-releases/releases/tag/1.81)
-* [srbminer](https://github.com/doktor83/SRBMiner-Multi/releases/tag/2.4.4)
+This is a lightweight daemon that allows mining to a local (or remote)
+cryptix node using stratum-base miners. It is up to the community to
+build a stratum based miner, the original built-in miner is using gRPC
+interface.
+
+## Browser Interface
+Here is a lightfull Browser Interface:
+
+[Cryptix Stratum Browser](https://github.com/cryptix-network/cryptix-stratum-bridge-browser-monitor)
+## Mining
+
+You can use SRB Miner, its supported for Cryptix and the Bridge/ Pools:
+[SRB Miner](https://github.com/doktor83/SRBMiner-Multi/releases)
+
+For local Node, http Node or Pool Mining you can use:
+[Cryptix-Miner](https://github.com/cryptix-network/cryptix-miner)
 
 
 ## Hive Setup
