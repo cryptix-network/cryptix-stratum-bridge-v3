@@ -331,7 +331,7 @@ func (sh *shareHandler) startStatsThread() error {
 			rateStr, ratioStr, sh.overall.BlocksFound.Load(), time.Since(start).Round(time.Second))
 		str += "\n-------------------------------------------------------------------------------\n"
 		str += " Est. Network Hashrate: " + stringifyHashrate(DiffToHash(sh.soloDiff))
-		str += "\n======================================================== cytx_bridge_" + version + " ===\n"
+		str += "\n======================================================== cryptix_bridge_" + version + " ===\n"
 		// sh.statsLock.Unlock()
 		log.Println(str)
 	}
@@ -462,7 +462,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		}
 		sort.Strings(statsLines)
 		stats += strings.Join(statsLines, "\n")
-		stats += "\n\n======================================================== aix_bridge_" + version + " ===\n"
+		stats += "\n\n======================================================== cryptix_bridge_" + version + " ===\n"
 		stats += strings.Join(toleranceErrs, "\n")
 		if logStats {
 			log.Println(stats)
