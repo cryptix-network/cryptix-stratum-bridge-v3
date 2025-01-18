@@ -3,7 +3,7 @@ module github.com/cryptix-network/cryptix-stratum-bridge
 go 1.18
 
 require (
-	github.com/cryptix-network/cryptix-stratum-bridge-v3
+	github.com/cryptix-network/cryptix-stratum-bridge-v3 v1.0.1 
 	github.com/cryptix-network/cryptixd v0.13.2
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.1
