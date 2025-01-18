@@ -9,7 +9,7 @@ import (
 	"log"
 	"math/big"
 
-	"lukechampine.com/blake3"
+	"golang.org/x/crypto/blake2b"
 
 	"github.com/cryptix-network/cryptixd/app/appmessage"
 )
@@ -64,10 +64,10 @@ func DiffToHash(diff float64) float64 {
 }
 
 func SerializeBlockHeader(template *appmessage.RPCBlock) ([]byte, error) {
-	var fixedSizeKey [32]byte
-	copy(fixedSizeKey[:], "BlockHash")
-	hasher := blake3.New(32, fixedSizeKey[:])
-
+	hasher, err := blake2b.New(32, []byte("BlockHash"))
+	if err != nil {
+		return nil, err
+	}
 	write16(hasher, uint16(template.Header.Version))
 	write64(hasher, uint64(len(template.Header.Parents)))
 	for _, v := range template.Header.Parents {
