@@ -54,8 +54,8 @@ github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e/go.mod h1:nSuG5e5P
 github.com/chzyer/test v0.0.0-20180213035817-a1ea475d72b1/go.mod h1:Q3SI9o4m/ZMnBNeIyt5eFwwo7qiLfzFZmjNmxjkiQlU=
 github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
 github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
-github.com/cryptix-network/cryptixd v0.13.2 h1:FcOnzL1xOl/+v7kIuYrh7/RRJQf7Hq58g+yeVITxIXc=
-github.com/cryptix-network/cryptixd v0.13.2/go.mod h1:oFzkdXFs0W4/LqEf1cx6lYMMU92mexyWqPnHE8WJNIM=
+github.com/cryptix-network/cryptixd v0.13.3 h1:k23BRvqw6Pz2zR7a2ZrM7pHiItwgNuuJeovsuSKaKZo=
+github.com/cryptix-network/cryptixd v0.13.3/go.mod h1:oFzkdXFs0W4/LqEf1cx6lYMMU92mexyWqPnHE8WJNIM=
 github.com/cryptix-network/go-muhash v0.0.4 h1:SFU0K4JGnb5MaDpsXFiH52GVXbopaxsGOIDFhJZ9emo=
 github.com/cryptix-network/go-muhash v0.0.4/go.mod h1:q0gmHyZzTZF5tC1kfFrA+cf9sp7o22UTpfPfAE5oHmw=
 github.com/cryptix-network/go-secp256k1 v0.0.7 h1:23ky7b5rWF9iEzmr5AFZLRlu/ZGg2cYVS9F/sGyIlJ4=
