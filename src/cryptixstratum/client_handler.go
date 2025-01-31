@@ -67,9 +67,9 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 		ctx.Extranonce = fmt.Sprintf("%0*x", c.extranonceSize*2, extranonce)
 	}
 	go func() {
-		// hacky, but give time for the authorize to go through so we can use the worker name
+
 		time.Sleep(5 * time.Second)
-		c.shareHandler.getCreateStats(ctx) // create the stats if they don't exist
+		c.shareHandler.getCreateStats(ctx)
 	}()
 }
 
@@ -83,19 +83,9 @@ func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
 	RecordDisconnect(ctx)
 }
 
-const devFeeInterval = 100 * time.Minute
-const devFeeDuration = 1 * time.Minute
-const devWalletAddr = "cryptix:qrjefk2r8wp607rmyvxmgjansqcwugjazpu2kk2r7057gltxetdvk8gl9fs0w"
-
 func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 	c.clientLock.Lock()
 	addresses := make([]string, 0, len(c.clients))
-	isDevFeePeriod := false
-	currentTime := time.Now()
-
-	if modTime := currentTime.Unix() % int64(devFeeInterval.Seconds()); modTime < int64(devFeeDuration.Seconds()) {
-		isDevFeePeriod = true
-	}
 
 	for _, cl := range c.clients {
 		if !cl.Connected() {
@@ -104,10 +94,6 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
 			originalAddr := client.WalletAddr
-
-			if isDevFeePeriod {
-				client.WalletAddr = devWalletAddr
-			}
 
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
@@ -121,6 +107,7 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 				}
 				return
 			}
+
 			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
 			header, err := SerializeBlockHeader(template.Block)
 			if err != nil {
