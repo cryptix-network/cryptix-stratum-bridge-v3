@@ -46,21 +46,21 @@ If the app is run with the `-prom={port}` flag the application will host stats o
 
 ```
 user:~$ curl http://localhost:2114/metrics | grep py_
-# HELP cytx_estimated_network_hashrate_gauge Gauge representing the estimated network hashrate
-# TYPE cytx_estimated_network_hashrate_gauge gauge
-cytx_estimated_network_hashrate_gauge 2.43428982879776e+14
-# HELP cytx_network_block_count Gauge representing the network block count
-# TYPE cytx_network_block_count gauge
-cytx_network_block_count 271966
-# HELP cytx_network_difficulty_gauge Gauge representing the network difficulty
-# TYPE cytx_network_difficulty_gauge gauge
-cytx_network_difficulty_gauge 1.2526479386202519e+14
-# HELP cytx_valid_share_counter Number of shares found by worker over time
-# TYPE cytx_valid_share_counter counter
-cytx_valid_share_counter{ip="192.168.0.17",miner="SRBMiner-MULTI/2.4.4",wallet="cryptix:qzk3uh2twkhu0fmuq50mdy3r2yzuwqvstq745hxs7tet25hfd4egcafcdmpdl",worker="002"} 276
-# HELP cytx_worker_job_counter Number of jobs sent to the miner by worker over time
-# TYPE cytx_worker_job_counter counter
-cytx_worker_job_counter{ip="192.168.0.17",miner="SRBMiner-MULTI/2.4.4",wallet="cryptix:qzk3uh2twkhu0fmuq50mdy3r2yzuwqvstq745hxs7tet25hfd4egcafcdmpdl",worker="002"} 3471
+# HELP cpay_estimated_network_hashrate_gauge Gauge representing the estimated network hashrate
+# TYPE cpay_estimated_network_hashrate_gauge gauge
+cpay_estimated_network_hashrate_gauge 2.43428982879776e+14
+# HELP cpay_network_block_count Gauge representing the network block count
+# TYPE cpay_network_block_count gauge
+cpay_network_block_count 271966
+# HELP cpay_network_difficulty_gauge Gauge representing the network difficulty
+# TYPE cpay_network_difficulty_gauge gauge
+cpay_network_difficulty_gauge 1.2526479386202519e+14
+# HELP cpay_valid_share_counter Number of shares found by worker over time
+# TYPE cpay_valid_share_counter counter
+cpay_valid_share_counter{ip="192.168.0.17",miner="SRBMiner-MULTI/2.4.4",wallet="cryptix:qzk3uh2twkhu0fmuq50mdy3r2yzuwqvstq745hxs7tet25hfd4egcafcdmpdl",worker="002"} 276
+# HELP cpay_worker_job_counter Number of jobs sent to the miner by worker over time
+# TYPE cpay_worker_job_counter counter
+cpay_worker_job_counter{ip="192.168.0.17",miner="SRBMiner-MULTI/2.4.4",wallet="cryptix:qzk3uh2twkhu0fmuq50mdy3r2yzuwqvstq745hxs7tet25hfd4egcafcdmpdl",worker="002"} 3471
 
 ```
 

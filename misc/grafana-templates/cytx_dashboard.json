@@ -258,7 +258,7 @@
           "exemplar": false,
           "expr": "increase(ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}[${resolution}]) *  ${show_balances}",
           "instant": false,
-          "legendFormat": "CYTX",
+          "legendFormat": "CPAY",
           "range": true,
           "refId": "A"
         }
@@ -325,7 +325,7 @@
           },
           "editorMode": "code",
           "expr": "SUM (ks_balance_by_wallet_gauge{wallet=~\"${wallet_filter}\"}) * ${show_balances}",
-          "legendFormat": "CYTX",
+          "legendFormat": "CPAY",
           "range": true,
           "refId": "A"
         }

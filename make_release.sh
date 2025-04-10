@@ -3,9 +3,9 @@ rm -rf release
 mkdir -p release
 cd release
 VERSION=1.1.7
-ARCHIVE="cytx_bridge-${VERSION}"
-OUTFILE="cytx_bridge"
-OUTDIR="cytx_bridge"
+ARCHIVE="cpay_bridge-${VERSION}"
+OUTFILE="cpay_bridge"
+OUTDIR="cpay_bridge"
 
 # windows
 mkdir -p ${OUTDIR};env GOOS=windows GOARCH=amd64 go build -o ${OUTDIR}/${OUTFILE}.exe ${CMD_PATH};cp ${CMD_PATH}/config.yaml ${OUTDIR}/

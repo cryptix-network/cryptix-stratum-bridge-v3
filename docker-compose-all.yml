@@ -1,9 +1,9 @@
 volumes:
   prometheus_data: {}
 services:
-  cytx_bridge:
+  cpay_bridge:
     image: cryptix/cryptix-stratum-bridge:latest
-    container_name: cytx_bridge
+    container_name: cpay_bridge
     restart: unless-stopped
     user: "0"
     command:
@@ -19,7 +19,7 @@ services:
       - host.docker.internal:host-gateway
   grafana:
     image: grafana/grafana-oss:latest
-    container_name: cytx_grafana
+    container_name: cpay_grafana
     restart: unless-stopped
     user: "0"
     volumes:

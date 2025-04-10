@@ -2,4 +2,4 @@
 
 [[ ! -e ./config.yaml ]] && echo "missing config.yaml" && pwd && exit 1
 
-cytx_bridge  $(< cytx_bridge.conf)| tee --append $CUSTOM_LOG_BASENAME.log
+cpay_bridge  $(< cpay_bridge.conf)| tee --append $CUSTOM_LOG_BASENAME.log
