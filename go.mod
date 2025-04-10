@@ -5,7 +5,7 @@ go 1.23
 toolchain go1.23.5
 
 require (
-	github.com/cryptix-network/cryptixd v0.13.5
+	github.com/cryptix-network/cryptixd v0.13.7
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.1
 	github.com/mattn/go-colorable v0.1.13
@@ -23,11 +23,13 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/protobuf v1.5.3 // indirect
 	github.com/jrick/logrotate v1.0.0 // indirect
+	github.com/klauspost/cpuid/v2 v2.0.12 // indirect
 	github.com/mattn/go-isatty v0.0.16 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/prometheus/client_model v0.2.0 // indirect
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
+	github.com/zeebo/blake3 v0.2.4 // indirect
 	go.uber.org/multierr v1.6.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
