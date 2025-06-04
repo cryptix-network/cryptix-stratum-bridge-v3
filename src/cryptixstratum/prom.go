@@ -120,7 +120,7 @@ func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64,
 	labels := commonLabels(worker)
 	labels["nonce"] = fmt.Sprintf("%d", nonce)
 	labels["bluescore"] = fmt.Sprintf("%d", bluescore)
-	labels["hash"] = fmt.Sprintf("%d", hash)
+	labels["hash"] = fmt.Sprintf("%s", hash)
 	blockGauge.With(labels).Set(1)
 }
 

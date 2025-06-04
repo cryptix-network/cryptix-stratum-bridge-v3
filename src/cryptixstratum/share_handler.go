@@ -256,8 +256,6 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		Id:     event.Id,
 		Result: true,
 	})
-
-	return nil
 }
 
 func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
