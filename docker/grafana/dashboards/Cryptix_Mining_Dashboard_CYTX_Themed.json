@@ -1,0 +1,1832 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Cryptix Network Mining Dashboard \u2014 Node, Stratum & Miner metrics",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "links": [],
+  "liveNow": true,
+  "panels": [
+    {
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 3,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 99,
+      "options": {
+        "code": {
+          "language": "plaintext",
+          "showLineNumbers": false,
+          "showMiniMap": false
+        },
+        "content": "<div style=\"display:flex;align-items:center;justify-content:space-between;padding:8px 20px;height:100%;background:linear-gradient(90deg,#040b0e 0%,#071a10 45%,#040b0e 100%);border-radius:4px;border-bottom:2px solid #0cb478;box-shadow:0 2px 20px #0cb47830\">\n  <div style=\"display:flex;align-items:center;gap:18px\">\n    <div style=\"font-size:30px;filter:drop-shadow(0 0 10px #0cb478)\">\u26cf</div>\n    <div>\n      <div style=\"font-family:'Courier New',monospace;font-size:20px;font-weight:900;letter-spacing:5px;background:linear-gradient(90deg,#0cb478,#1864e4,#0cb478);-webkit-background-clip:text;-webkit-text-fill-color:transparent\">CRYPTIX MINING OPS</div>\n      <div style=\"font-family:'Courier New',monospace;font-size:10px;letter-spacing:4px;color:#0cb478;margin-top:3px;opacity:0.7\">NODE \u00b7 STRATUM \u00b7 MINER \u00b7 PROMETHEUS</div>\n    </div>\n  </div>\n  <div style=\"display:flex;align-items:center;gap:24px\">\n    <div style=\"font-family:'Courier New',monospace;text-align:center\">\n      <div style=\"font-size:10px;color:#0a9664;letter-spacing:2px;opacity:0.7\">ALGORITHM</div>\n      <div style=\"font-size:12px;color:#0cb478;letter-spacing:2px;font-weight:700\">CRYPTIX OX8</div>\n    </div>\n    <div style=\"width:1px;height:30px;background:#0cb47840\"></div>\n    <div style=\"font-family:'Courier New',monospace;text-align:center\">\n      <div style=\"font-size:10px;color:#0a9664;letter-spacing:2px;opacity:0.7\">NETWORK</div>\n      <div style=\"font-size:12px;color:#1864e4;letter-spacing:2px;font-weight:700\">BLOCKDAG</div>\n    </div>\n    <div style=\"width:1px;height:30px;background:#0cb47840\"></div>\n    <div style=\"text-align:right;font-family:'Courier New',monospace\">\n      <div style=\"font-size:12px;color:#0cb478;letter-spacing:3px;text-shadow:0 0 8px #0cb478\">\u25c9 LIVE</div>\n      <div style=\"font-size:9px;color:#0a9664;letter-spacing:2px;margin-top:3px;opacity:0.7\">AUTO-REFRESH 30s</div>\n    </div>\n  </div>\n</div>",
+        "mode": "html"
+      },
+      "pluginVersion": "12.4.0",
+      "title": "",
+      "transparent": true,
+      "type": "text"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 3
+      },
+      "id": 100,
+      "panels": [],
+      "title": "\u23f1  ESTIMATED TIME TO FIND",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Network Difficulty \u00f7 (Miner Hashrate \u00d7 100000000).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 604800,
+          "min": 0,
+          "noValue": "Calculating...",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              },
+              {
+                "color": "#1864e4",
+                "value": 3600
+              },
+              {
+                "color": "#e08820",
+                "value": 86400
+              },
+              {
+                "color": "#e08820",
+                "value": 259200
+              },
+              {
+                "color": "#c83050",
+                "value": 604800
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "id": 1,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "text": {
+          "titleSize": 14,
+          "valueSize": 28
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "py_network_difficulty_gauge\r\n/ on(instance, job) group_right(miner, wallet, worker)\r\n  (rate(py_valid_share_diff_counter{worker!=\"\"}[30m]) * 1000000000)",
+          "instant": true,
+          "legendFormat": "ETF",
+          "refId": "A"
+        }
+      ],
+      "title": "\u23f1  Estimated Time to Find",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "ETF expressed in hours. Max scale = 168h (1 week).",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 1,
+          "mappings": [],
+          "max": 168,
+          "min": 0,
+          "noValue": "Calculating...",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              },
+              {
+                "color": "#1864e4",
+                "value": 1
+              },
+              {
+                "color": "#e08820",
+                "value": 24
+              },
+              {
+                "color": "#e08820",
+                "value": 72
+              },
+              {
+                "color": "#c83050",
+                "value": 168
+              }
+            ]
+          },
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "id": 2,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "text": {
+          "titleSize": 14,
+          "valueSize": 28
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "(\r\n  py_network_difficulty_gauge\r\n  / on(instance, job) group_right(miner, wallet, worker)\r\n  (rate(py_valid_share_diff_counter{worker!=\"\"}[30m]) * 1000000000)\r\n) / 3600",
+          "instant": true,
+          "legendFormat": "Hours",
+          "refId": "A"
+        }
+      ],
+      "title": "\u23f3  ETF in Hours",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Your share of total network hashrate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 2,
+          "mappings": [],
+          "max": 1,
+          "min": 0,
+          "noValue": "Calculating...",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#c83050",
+                "value": 0
+              },
+              {
+                "color": "#e08820",
+                "value": 0.0001
+              },
+              {
+                "color": "#e08820",
+                "value": 0.001
+              },
+              {
+                "color": "#0cb478",
+                "value": 0.01
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 4
+      },
+      "id": 3,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "sizing": "auto",
+        "text": {
+          "titleSize": 14,
+          "valueSize": 28
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "(rate(py_valid_share_diff_counter{worker!=\"\"}[30m]) * 1000000000)\r\n/ on(instance, job) group_left(miner, wallet, worker)\r\npy_estimated_network_hashrate_gauge",
+          "instant": true,
+          "legendFormat": "Pool Share",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcca  % of Network Hashrate",
+      "type": "gauge"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 101,
+      "panels": [],
+      "title": "\u26a1  HASHRATE",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Derived from valid share difficulty \u00d7 100000000.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#0cb478",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "Hs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 13
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "rate(py_valid_share_diff_counter[25m]) * 1000000000",
+          "legendFormat": "Miner Hashrate",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\u26a1  Miner Hashrate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Total estimated network hashrate from your node.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#1864e4",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "Hs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 13
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "mean"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "py_estimated_network_hashrate_gauge",
+          "legendFormat": "Network Hashrate",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83c\udf10  Network Hashrate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 21
+      },
+      "id": 102,
+      "panels": [],
+      "title": "\u2705  SHARE QUALITY",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Valid \u00f7 (Valid + Invalid). Below 95% = latency or instability.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "max": 1,
+          "min": 0.8,
+          "noValue": "No shares yet",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#c83050",
+                "value": 0
+              },
+              {
+                "color": "#e08820",
+                "value": 0.9
+              },
+              {
+                "color": "#e08820",
+                "value": 0.95
+              },
+              {
+                "color": "#0cb478",
+                "value": 0.99
+              }
+            ]
+          },
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 6,
+        "x": 0,
+        "y": 22
+      },
+      "id": 6,
+      "options": {
+        "minVizHeight": 75,
+        "minVizWidth": 75,
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showThresholdLabels": true,
+        "showThresholdMarkers": true,
+        "sizing": "auto"
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "rate(py_valid_share_counter[10m]) / (rate(py_valid_share_counter[10m]) + (rate(py_invalid_share_counter[10m]) or vector(0)))",
+          "instant": true,
+          "legendFormat": "Acceptance",
+          "refId": "A"
+        }
+      ],
+      "title": "\u2705  Share Acceptance Rate",
+      "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Alert if invalid shares exceed 5% of valid share rate.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Valid Shares/s"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#0cb478",
+                  "mode": "fixed"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Invalid Shares/s"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#c83050",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 35
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 6,
+        "y": 22
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "rate(py_valid_share_counter[10m])",
+          "legendFormat": "Valid Shares/s",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "rate(py_invalid_share_counter[10m])",
+          "legendFormat": "Invalid Shares/s",
+          "refId": "B"
+        }
+      ],
+      "title": "\ud83d\udcc9  Valid vs Invalid Share Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Sustained spikes = hardware or network issue.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#e08820",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 0.001
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 22
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "rate(py_invalid_share_counter[10m])",
+          "legendFormat": "Invalid/s",
+          "refId": "A"
+        }
+      ],
+      "title": "\u274c  Invalid Share Rate",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 29
+      },
+      "id": 103,
+      "panels": [],
+      "title": "\ud83d\udc77  WORKERS",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Jobs dispatched per second. Flat = workers not receiving work.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#1864e4",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "rate(py_worker_job_counter[10m])",
+          "legendFormat": "Jobs/s",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udc77  Worker Job Rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Any sustained value here needs investigation.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#c83050",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "bars",
+            "fillOpacity": 80,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              },
+              {
+                "color": "red",
+                "value": 0.01
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezone": [
+          "browser"
+        ],
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "increase(py_worker_disconnect_counter[10m])",
+          "legendFormat": "Disconnects/s",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udd0c  Worker Disconnects",
+      "transparent": true,
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 37
+      },
+      "id": 104,
+      "panels": [],
+      "title": "\ud83d\udcb0  REWARDS & NETWORK",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Lifetime total blocks found by your pool/miner.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1864e4",
+                "value": 0
+              },
+              {
+                "color": "#0cb478",
+                "value": 1
+              },
+              {
+                "color": "#e08820",
+                "value": 10
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 0,
+        "y": 38
+      },
+      "id": 11,
+      "options": {
+        "colorMode": "background_solid",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 13,
+          "valueSize": 34
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "py_blocpy_mined",
+          "instant": true,
+          "legendFormat": "All Time",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udc8e  Total Blocks Mined",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Blocks found in the last 24 hours.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "decimals": 0,
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "color": "#334155",
+                  "text": "None yet"
+                }
+              },
+              "type": "value"
+            }
+          ],
+          "noValue": "0",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#1864e4",
+                "value": 0
+              },
+              {
+                "color": "#e08820",
+                "value": 500
+              },
+              {
+                "color": "#0cb478",
+                "value": 1000
+              },
+              {
+                "color": "#0cb478",
+                "value": 2500
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 6,
+        "y": 38
+      },
+      "id": 17,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 13,
+          "valueSize": 34
+        },
+        "textMode": "value_and_name",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "sum(increase(py_blocpy_mined[24h]))",
+          "instant": true,
+          "legendFormat": "Last 24h",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(increase(py_blocpy_mined[7d]))",
+          "instant": true,
+          "legendFormat": "Last 7d",
+          "range": false,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "sum(increase(py_blocpy_mined[30d]))",
+          "instant": true,
+          "legendFormat": "Last 30d",
+          "range": false,
+          "refId": "C"
+        }
+      ],
+      "title": "\ud83e\uddf1  Blocks Found (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Live current balance per wallet.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-viridis"
+          },
+          "decimals": 4,
+          "mappings": [],
+          "max": 1000000,
+          "min": 0,
+          "noValue": "0.0000",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              },
+              {
+                "color": "#e08820",
+                "value": 10
+              },
+              {
+                "color": "#0cb478",
+                "value": 100
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 12,
+        "y": 38
+      },
+      "id": 13,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 32
+        },
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "py_balance_by_wallet_gauge",
+          "instant": true,
+          "legendFormat": "{{wallet}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcb0  Wallet Balance \u2014 Current",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Balance change over the selected time window. Use the dropdown at the top to switch between 24h / 1 Week / 30 Days.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "continuous-viridis"
+          },
+          "decimals": 6,
+          "mappings": [],
+          "max": 10000,
+          "min": 0,
+          "noValue": "No change",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#c83050",
+                "value": 0
+              },
+              {
+                "color": "#e08820",
+                "value": 0
+              },
+              {
+                "color": "#0cb478",
+                "value": 0.0001
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 6,
+        "x": 18,
+        "y": 38
+      },
+      "id": 18,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "area",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "text": {
+          "titleSize": 12,
+          "valueSize": 32
+        },
+        "textMode": "value",
+        "wideLayout": true
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "delta(py_balance_by_wallet_gauge[$balance_window])",
+          "instant": true,
+          "legendFormat": "{{wallet}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc8  Wallet Earned \u2014 $balance_window",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Balance history per wallet. Adjust dashboard time range to zoom in/out.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#0cb478",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "decimals": 4,
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 44
+      },
+      "id": 19,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "min",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "right",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "py_balance_by_wallet_gauge",
+          "legendFormat": "{{wallet}}",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcb0  Wallet Balance Over Time",
+      "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "id": 105,
+      "panels": [],
+      "title": "\ud83d\udcc8  NETWORK",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Rising difficulty = more competition = longer ETF.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#1864e4",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "sishort"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 14,
+        "x": 0,
+        "y": 52
+      },
+      "id": 15,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull",
+            "max",
+            "min"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "editorMode": "code",
+          "expr": "py_network_difficulty_gauge *2",
+          "legendFormat": "Network Difficulty",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83d\udcc8  Network Difficulty",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "wFbInMnVk"
+      },
+      "description": "Rate of new blocks on the network.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#e08820",
+            "mode": "fixed"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": true,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 20,
+            "gradientMode": "opacity",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "showValues": false,
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#0cb478",
+                "value": 0
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 10,
+        "x": 14,
+        "y": 52
+      },
+      "id": 16,
+      "options": {
+        "legend": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.4.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "wFbInMnVk"
+          },
+          "expr": "py_network_block_count",
+          "legendFormat": "Block Height",
+          "refId": "A"
+        }
+      ],
+      "title": "\ud83e\uddf1  Block Height Over Time",
+      "type": "timeseries"
+    }
+  ],
+  "preload": false,
+  "refresh": "30s",
+  "schemaVersion": 42,
+  "tags": [
+    "cryptix",
+    "mining",
+    "prometheus",
+    "stratum"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "text": "24h",
+          "value": "24h"
+        },
+        "description": "Time window for wallet balance change calculation",
+        "includeAll": false,
+        "label": "Balance Window",
+        "name": "balance_window",
+        "options": [],
+        "query": "24h,168h,720h",
+        "type": "custom",
+        "valuesFormat": "csv"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-3h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m"
+    ]
+  },
+  "timezone": "browser",
+  "title": "\u26cf Cryptix Mining Dashboard",
+  "uid": "cryptix-mining-v5",
+  "version": 15,
+  "weekStart": "",
+  "style": "dark"
+}
