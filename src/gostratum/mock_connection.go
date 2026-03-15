@@ -1,19 +1,23 @@
 package gostratum
 
 import (
-	"context"
 	"fmt"
+	"io"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 type MockConnection struct {
-	id      string
-	lock    sync.Mutex // to prevent double closing of channel
-	inChan  chan []byte
-	outChan chan []byte
+	id            string
+	inChan        chan []byte
+	outChan       chan []byte
+	closed        atomic.Bool
+	closeOnce     sync.Once
+	readDeadline  atomic.Int64
+	writeDeadline atomic.Int64
 }
 
 var channelCounter int32
@@ -21,7 +25,6 @@ var channelCounter int32
 func NewMockConnection() *MockConnection {
 	return &MockConnection{
 		id:      fmt.Sprintf("mc_%d", atomic.AddInt32(&channelCounter, 1)),
-		lock:    sync.Mutex{},
 		inChan:  make(chan []byte),
 		outChan: make(chan []byte),
 	}
@@ -29,40 +32,94 @@ func NewMockConnection() *MockConnection {
 
 func (mc *MockConnection) AsyncWriteTestDataToReadBuffer(s string) {
 	go func() {
+		if mc.closed.Load() {
+			return
+		}
+		defer func() { _ = recover() }()
 		mc.inChan <- []byte(s)
 	}()
 }
 
 func (mc *MockConnection) ReadTestDataFromBuffer(handler func([]byte)) {
-	read := <-mc.outChan
+	read, ok := <-mc.outChan
+	if !ok {
+		return
+	}
 	handler(read)
 }
 
 func (mc *MockConnection) AsyncReadTestDataFromBuffer(handler func([]byte)) {
 	go func() {
-		read := <-mc.outChan
+		read, ok := <-mc.outChan
+		if !ok {
+			return
+		}
 		handler(read)
 	}()
 }
 
 func (mc *MockConnection) Read(b []byte) (int, error) {
+	if mc.closed.Load() {
+		return 0, io.EOF
+	}
+
+	readDeadline := mc.readDeadline.Load()
+	timeout := time.Until(time.Unix(0, readDeadline))
+	if readDeadline > 0 {
+		if timeout <= 0 {
+			return 0, os.ErrDeadlineExceeded
+		}
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		select {
+		case data, ok := <-mc.inChan:
+			if !ok {
+				return 0, io.EOF
+			}
+			return copy(b, data), nil
+		case <-timer.C:
+			return 0, os.ErrDeadlineExceeded
+		}
+	}
+
 	data, ok := <-mc.inChan
 	if !ok {
-		return 0, context.DeadlineExceeded
+		return 0, io.EOF
 	}
 	return copy(b, data), nil
 }
 
 func (mc *MockConnection) Write(b []byte) (int, error) {
+	if mc.closed.Load() {
+		return 0, io.EOF
+	}
+
+	writeDeadline := mc.writeDeadline.Load()
+	timeout := time.Until(time.Unix(0, writeDeadline))
+	if writeDeadline > 0 {
+		if timeout <= 0 {
+			return 0, os.ErrDeadlineExceeded
+		}
+		timer := time.NewTimer(timeout)
+		defer timer.Stop()
+		select {
+		case mc.outChan <- b:
+			return len(b), nil
+		case <-timer.C:
+			return 0, os.ErrDeadlineExceeded
+		}
+	}
+
 	mc.outChan <- b
 	return len(b), nil
 }
 
 func (mc *MockConnection) Close() error {
-	mc.lock.Lock()
-	defer mc.lock.Unlock()
-	close(mc.inChan)
-	close(mc.outChan)
+	mc.closeOnce.Do(func() {
+		mc.closed.Store(true)
+		close(mc.inChan)
+		close(mc.outChan)
+	})
 	return nil
 }
 
@@ -88,25 +145,19 @@ func (mc *MockConnection) SetDeadline(t time.Time) error {
 }
 
 func (mc *MockConnection) SetReadDeadline(t time.Time) error {
-	go func() {
-		mc.lock.Lock()
-		defer mc.lock.Unlock()
-		time.Sleep(time.Until(t))
-		close(mc.inChan)
-		mc.inChan = make(chan []byte)
-	}()
-
+	if t.IsZero() {
+		mc.readDeadline.Store(0)
+		return nil
+	}
+	mc.readDeadline.Store(t.UnixNano())
 	return nil
 }
 
 func (mc *MockConnection) SetWriteDeadline(t time.Time) error {
-	go func() {
-		mc.lock.Lock()
-		defer mc.lock.Unlock()
-		time.Sleep(time.Until(t))
-		close(mc.outChan)
-		mc.outChan = make(chan []byte)
-	}()
-
+	if t.IsZero() {
+		mc.writeDeadline.Store(0)
+		return nil
+	}
+	mc.writeDeadline.Store(t.UnixNano())
 	return nil
 }

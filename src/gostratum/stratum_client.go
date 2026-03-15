@@ -3,9 +3,9 @@ package gostratum
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -14,16 +14,10 @@ import (
 
 func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumListener) error {
 	defer ctx.Disconnect()
+	reader := bufio.NewReader(connection)
 
 	for {
-		err := readFromConnection(connection, func(line string) error {
-			event, err := UnmarshalEvent(line)
-			if err != nil {
-				ctx.Logger.Error("error unmarshalling event", zap.String("raw", line))
-				return err
-			}
-			return s.HandleEvent(ctx, event)
-		})
+		line, err := readFromConnection(connection, reader)
 		if errors.Is(err, os.ErrDeadlineExceeded) {
 			continue // expected timeout
 		}
@@ -37,28 +31,40 @@ func spawnClientListener(ctx *StratumContext, connection net.Conn, s *StratumLis
 			ctx.Logger.Error("error reading from socket", zap.Error(err))
 			return err
 		}
-	}
-}
 
-type LineCallback func(line string) error
+		if line == "" {
+			continue
+		}
 
-func readFromConnection(connection net.Conn, cb LineCallback) error {
-	deadline := time.Now().Add(5 * time.Second).UTC()
-	if err := connection.SetReadDeadline(deadline); err != nil {
-		return err
-	}
-
-	buffer := make([]byte, 1024)
-	_, err := connection.Read(buffer)
-	if err != nil {
-		return errors.Wrapf(err, "error reading from connection")
-	}
-	buffer = bytes.ReplaceAll(buffer, []byte("\x00"), nil)
-	scanner := bufio.NewScanner(strings.NewReader(string(buffer)))
-	for scanner.Scan() {
-		if err := cb(scanner.Text()); err != nil {
+		event, err := UnmarshalEvent(line)
+		if err != nil {
+			ctx.Logger.Error("error unmarshalling event", zap.String("raw", line))
+			return err
+		}
+		if err := s.HandleEvent(ctx, event); err != nil {
 			return err
 		}
 	}
-	return nil
+}
+
+const maxEventLineBytes = 1 << 20
+
+func readFromConnection(connection net.Conn, reader *bufio.Reader) (string, error) {
+	deadline := time.Now().Add(5 * time.Second).UTC()
+	if err := connection.SetReadDeadline(deadline); err != nil {
+		return "", err
+	}
+
+	line, err := reader.ReadBytes('\n')
+	if err != nil {
+		return "", errors.Wrapf(err, "error reading from connection")
+	}
+
+	if len(line) > maxEventLineBytes {
+		return "", fmt.Errorf("incoming stratum message exceeds max length: %d bytes", len(line))
+	}
+
+	line = bytes.ReplaceAll(line, []byte("\x00"), nil)
+	line = bytes.TrimSpace(line)
+	return string(line), nil
 }

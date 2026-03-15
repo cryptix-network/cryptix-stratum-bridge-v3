@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	stdatomic "sync/atomic"
 	"time"
 
 	"github.com/cryptix-network/cryptix-stratum-bridge-v3/src/gostratum"
@@ -40,57 +41,67 @@ type WorkStats struct {
 
 type shareHandler struct {
 	cryptix      *rpcclient.RPCClient
-	soloDiff     float64
+	soloDiffBits stdatomic.Uint64
 	stats        map[string]*WorkStats
-	statsLock    sync.Mutex
+	statsLock    sync.RWMutex
 	overall      WorkStats
-	tipBlueScore uint64
+	tipBlueScore stdatomic.Uint64
+	dupeLock     sync.Mutex
+	dupeShares   map[string]*shareHistory
+}
+
+type shareHistory struct {
+	order []string
+	set   map[string]struct{}
 }
 
 func newShareHandler(cryptix *rpcclient.RPCClient) *shareHandler {
 	return &shareHandler{
-		cryptix:   cryptix,
-		stats:     map[string]*WorkStats{},
-		statsLock: sync.Mutex{},
+		cryptix:    cryptix,
+		stats:      map[string]*WorkStats{},
+		statsLock:  sync.RWMutex{},
+		dupeShares: map[string]*shareHistory{},
 	}
 }
 
 func (sh *shareHandler) getCreateStats(ctx *gostratum.StratumContext) *WorkStats {
 	sh.statsLock.Lock()
-	var stats *WorkStats
-	found := false
-	if ctx.WorkerName != "" {
-		stats, found = sh.stats[ctx.WorkerName]
-	}
-	if !found { // no worker name, check by remote address
-		stats, found = sh.stats[ctx.RemoteAddr]
-		if found {
-			// no worker name, but remote addr is there
-			// so replacet the remote addr with the worker names
+	defer sh.statsLock.Unlock()
+
+	key := workerStatsKey(ctx)
+	displayName := workerStatsDisplayName(ctx)
+	stats, found := sh.stats[key]
+	if !found && key != ctx.RemoteAddr {
+		// Stats may have been created before authorize, under remote address.
+		if migrated, exists := sh.stats[ctx.RemoteAddr]; exists {
+			stats = migrated
+			found = true
 			delete(sh.stats, ctx.RemoteAddr)
-			stats.WorkerName = ctx.WorkerName
-			sh.stats[ctx.WorkerName] = stats
+			sh.stats[key] = stats
 		}
 	}
-	if !found { // legit doesn't exist, create it
+
+	if !found {
 		stats = &WorkStats{}
-		stats.LastShare = time.Now()
-		stats.WorkerName = ctx.RemoteAddr
-		stats.StartTime = time.Now()
-		sh.stats[ctx.RemoteAddr] = stats
+		now := time.Now()
+		stats.LastShare = now
+		stats.WorkerName = displayName
+		stats.StartTime = now
+		sh.stats[key] = stats
 
 		// TODO: not sure this is the best place, nor whether we shouldn't be
 		// resetting on disconnect
 		InitWorkerCounters(ctx)
+	} else if stats.WorkerName != displayName {
+		stats.WorkerName = displayName
 	}
-
-	sh.statsLock.Unlock()
 	return stats
 }
 
 type submitInfo struct {
 	block    *appmessage.RPCBlock
 	state    *MiningState
+	jobID    int
 	noncestr string
 	nonceVal uint64
 }
@@ -124,6 +135,7 @@ func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent)
 	return &submitInfo{
 		state:    state,
 		block:    block,
+		jobID:    int(jobId),
 		noncestr: strings.Replace(noncestr, "0x", "", 1),
 	}, nil
 }
@@ -136,23 +148,95 @@ var (
 // the max difference between tip blue score and job blue score that we'll accept
 // anything greater than this is considered a stale
 const workWindow = 8
+const maxTrackedSharesPerWorker = 2048
+
+func workerStatsKey(ctx *gostratum.StratumContext) string {
+	if ctx.WorkerName != "" && ctx.WorkerName != gostratum.AnonymousWorkerName {
+		return ctx.WorkerName
+	}
+	return ctx.RemoteAddr
+}
+
+func workerStatsDisplayName(ctx *gostratum.StratumContext) string {
+	if ctx.WorkerName == "" {
+		return gostratum.AnonymousWorkerName
+	}
+	return ctx.WorkerName
+}
+
+func shareKey(si *submitInfo) string {
+	return fmt.Sprintf("%d:%s", si.jobID, si.noncestr)
+}
+
+func (sh *shareHandler) trackDupeShare(ctx *gostratum.StratumContext, si *submitInfo) bool {
+	worker := workerStatsKey(ctx)
+	key := shareKey(si)
+
+	sh.dupeLock.Lock()
+	defer sh.dupeLock.Unlock()
+
+	history, ok := sh.dupeShares[worker]
+	if !ok {
+		history = &shareHistory{
+			order: make([]string, 0, maxTrackedSharesPerWorker),
+			set:   make(map[string]struct{}, maxTrackedSharesPerWorker),
+		}
+		sh.dupeShares[worker] = history
+	}
+
+	if _, exists := history.set[key]; exists {
+		return true
+	}
+
+	history.set[key] = struct{}{}
+	history.order = append(history.order, key)
+	if len(history.order) > maxTrackedSharesPerWorker {
+		evicted := history.order[0]
+		history.order = history.order[1:]
+		delete(history.set, evicted)
+	}
+
+	return false
+}
 
 func (sh *shareHandler) checkStales(ctx *gostratum.StratumContext, si *submitInfo) error {
-	tip := sh.tipBlueScore
-	if si.block.Header.BlueScore > tip {
-		sh.tipBlueScore = si.block.Header.BlueScore
-		return nil // can't be
+	shareBlueScore := si.block.Header.BlueScore
+	for {
+		tip := sh.tipBlueScore.Load()
+		if shareBlueScore > tip {
+			if sh.tipBlueScore.CompareAndSwap(tip, shareBlueScore) {
+				break
+			}
+			continue
+		}
+		if tip-shareBlueScore > workWindow {
+			return errors.Wrapf(ErrStaleShare, "blueScore %d vs %d", shareBlueScore, tip)
+		}
+		break
 	}
-	if tip-si.block.Header.BlueScore > workWindow {
-		RecordStaleShare(ctx)
-		return errors.Wrapf(ErrStaleShare, "blueScore %d vs %d", si.block.Header.BlueScore, tip)
+
+	if sh.trackDupeShare(ctx, si) {
+		return ErrDupeShare
 	}
-	// TODO (bs): dupe share tracking
+
 	return nil
 }
 
 func (sh *shareHandler) setSoloDiff(diff float64) {
-	sh.soloDiff = diff
+	sh.soloDiffBits.Store(math.Float64bits(diff))
+}
+
+func (sh *shareHandler) getSoloDiff() float64 {
+	return math.Float64frombits(sh.soloDiffBits.Load())
+}
+
+func (sh *shareHandler) clearClientDupeHistory(ctx *gostratum.StratumContext) {
+	sh.dupeLock.Lock()
+	defer sh.dupeLock.Unlock()
+	delete(sh.dupeShares, ctx.RemoteAddr)
+	if ctx.WorkerName != "" {
+		delete(sh.dupeShares, ctx.WorkerName)
+	}
 }
 
 func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent, soloMining bool) error {
@@ -171,24 +255,14 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	}
 
 	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
-	state := GetMiningState(ctx)
-
-	if state.useBigJob {
-		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
-		if err != nil {
-			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
-			return errors.Wrap(err, "failed parsing noncestr")
-		}
-	} else {
-		submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
-		if err != nil {
-			RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
-			return errors.Wrap(err, "failed parsing noncestr")
-		}
+	submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
+	if err != nil {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		return errors.Wrap(err, "failed parsing noncestr")
 	}
 	stats := sh.getCreateStats(ctx)
 	if err := sh.checkStales(ctx, submitInfo); err != nil {
-		if err == ErrDupeShare {
+		if errors.Is(err, ErrDupeShare) {
 			ctx.Logger.Warn("duplicate share: " + submitInfo.noncestr)
 			RecordDupeShare(ctx)
 			stats.InvalidShares.Add(1)
@@ -215,13 +289,18 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	powState := pow.NewState(mutableHeader)
 	powValue := powState.CalculateProofOfWorkValue()
+	shareHashValue, shareTarget, _ := submitInfo.state.GetStratumDiffSnapshot()
+	if shareTarget == nil {
+		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
+		return fmt.Errorf("mining state is not initialized for client")
+	}
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
 		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
 			return err
 		}
-	} else if powValue.Cmp(state.stratumDiff.targetValue) >= 0 {
+	} else if powValue.Cmp(shareTarget) >= 0 {
 		if soloMining {
 			ctx.Logger.Warn("weak block")
 		} else {
@@ -247,10 +326,10 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 
 	stats.SharesFound.Add(1)
 	stats.VarDiffSharesFound.Add(1)
-	stats.SharesDiff.Add(state.stratumDiff.hashValue)
+	stats.SharesDiff.Add(shareHashValue)
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
-	RecordShareFound(ctx, state.stratumDiff.hashValue)
+	RecordShareFound(ctx, shareHashValue)
 
 	return ctx.Reply(gostratum.JsonRpcResponse{
 		Id:     event.Id,
@@ -294,7 +373,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	stats := sh.getCreateStats(ctx)
 	stats.BlocksFound.Add(1)
 	sh.overall.BlocksFound.Add(1)
-	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore(), blockhash.String())
+	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore())
 
 	// nil return allows HandleSubmit to record share (blocks are shares too!) and
 	// handle the response to the client
@@ -306,7 +385,7 @@ func (sh *shareHandler) startStatsThread() error {
 	for {
 		// console formatting is terrible. Good luck whever touches anything
 		time.Sleep(10 * time.Second)
-		// sh.statsLock.Lock()
+		sh.statsLock.RLock()
 		str := "\n===============================================================================\n"
 		str += "  worker name   |  avg hashrate  |   acc/stl/inv  |    blocks    |    uptime   \n"
 		str += "-------------------------------------------------------------------------------\n"
@@ -328,45 +407,30 @@ func (sh *shareHandler) startStatsThread() error {
 		str += fmt.Sprintf("                | %14.14s | %14.14s | %12d | %11s",
 			rateStr, ratioStr, sh.overall.BlocksFound.Load(), time.Since(start).Round(time.Second))
 		str += "\n-------------------------------------------------------------------------------\n"
-		str += " Est. Network Hashrate: " + stringifyHashrate(DiffToHash(sh.soloDiff))
+		str += " Est. Network Hashrate: " + stringifyHashrate(DiffToHash(sh.getSoloDiff()))
 		str += "\n======================================================== cryptix_bridge_" + version + " ===\n"
-		// sh.statsLock.Unlock()
+		sh.statsLock.RUnlock()
 		log.Println(str)
 	}
 }
 
 func GetAverageHashrateGHs(stats *WorkStats) float64 {
-	return stats.SharesDiff.Load() / time.Since(stats.StartTime).Seconds()
+	elapsed := time.Since(stats.StartTime).Seconds()
+	if elapsed <= 0 {
+		return 0
+	}
+	return stats.SharesDiff.Load() / elapsed
 }
 
 func stringifyHashrate(ghs float64) string {
 	unitStrings := [...]string{"", "K", "M", "G", "T", "P", "E", "Z", "Y"}
-	var unit string
-	var hr float64
-
-	if ghs*1000000 < 1 {
-		hr = ghs * 1000 * 1000 * 1000
-		unit = unitStrings[0]
-	} else if ghs*1000 < 1 {
-		hr = ghs * 1000 * 1000
-		unit = unitStrings[1]
-	} else if ghs < 1 {
-		hr = ghs * 1000
-		unit = unitStrings[2]
-	} else if ghs < 1000 {
-		hr = ghs
-		unit = unitStrings[3]
-	} else {
-		for i, u := range unitStrings[4:] {
-			hr = ghs / (float64(i) * 1000)
-			if hr < 1000 {
-				break
-			}
-			unit = u
-		}
+	hr := ghs * 1_000_000_000 // convert from GH/s to H/s
+	unitIdx := 0
+	for hr >= 1000 && unitIdx < len(unitStrings)-1 {
+		hr /= 1000
+		unitIdx++
 	}
-
-	return fmt.Sprintf("%0.2f%sH/s", hr, unit)
+	return fmt.Sprintf("%0.2f%sH/s", hr, unitStrings[unitIdx])
 }
 
 func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool) error {
@@ -379,13 +443,13 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 	//   < 5% variation after 4h
 	var windows = [...]uint{1, 3, 10, 30, 60, 240, 0}
 	var tolerances = [...]float64{1, 0.5, 0.25, 0.15, 0.1, 0.05, 0.05}
+	if expectedShareRate == 0 {
+		expectedShareRate = 1
+	}
 
 	for {
 		time.Sleep(varDiffThreadSleep * time.Second)
-
-		// don't like locking entire stats struct - risk should be negligible
-		// if mutex is ultimately needed, should move to one per client
-		// sh.statsLock.Lock()
+		sh.statsLock.Lock()
 
 		stats := "\n=== vardiff ===================================================================\n\n"
 		stats += "  worker name  |    diff     |  window  |  elapsed   |    shares   |   rate    \n"
@@ -404,6 +468,9 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 			diff := v.MinDiff.Load()
 			shares := v.VarDiffSharesFound.Load()
 			duration := time.Since(v.VarDiffStartTime).Minutes()
+			if duration <= 0 {
+				continue
+			}
 			shareRate := float64(shares) / duration
 			shareRateRatio := shareRate / float64(expectedShareRate)
 			window := windows[v.VarDiffWindow]
@@ -465,8 +532,7 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 		if logStats {
 			log.Println(stats)
 		}
-
-		// sh.statsLock.Unlock()
+		sh.statsLock.Unlock()
 	}
 }
 
@@ -490,16 +556,22 @@ func startVarDiff(stats *WorkStats) {
 
 func (sh *shareHandler) startClientVardiff(ctx *gostratum.StratumContext) {
 	stats := sh.getCreateStats(ctx)
+	sh.statsLock.Lock()
+	defer sh.statsLock.Unlock()
 	startVarDiff(stats)
 }
 
 func (sh *shareHandler) getClientVardiff(ctx *gostratum.StratumContext) float64 {
 	stats := sh.getCreateStats(ctx)
+	sh.statsLock.RLock()
+	defer sh.statsLock.RUnlock()
 	return stats.MinDiff.Load()
 }
 
 func (sh *shareHandler) setClientVardiff(ctx *gostratum.StratumContext, minDiff float64) float64 {
 	stats := sh.getCreateStats(ctx)
+	sh.statsLock.Lock()
+	defer sh.statsLock.Unlock()
 	previousMinDiff := updateVarDiff(stats, math.Max(minDiff, 0.00001))
 	startVarDiff(stats)
 	return previousMinDiff

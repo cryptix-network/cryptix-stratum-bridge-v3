@@ -74,23 +74,32 @@ func (c *clientListener) OnConnect(ctx *gostratum.StratumContext) {
 }
 
 func (c *clientListener) OnDisconnect(ctx *gostratum.StratumContext) {
-	ctx.Done()
 	c.clientLock.Lock()
 	c.logger.Info("removing client ", ctx.Id)
 	delete(c.clients, ctx.Id)
 	c.logger.Info("removed client ", ctx.Id)
 	c.clientLock.Unlock()
+	c.shareHandler.clearClientDupeHistory(ctx)
 	RecordDisconnect(ctx)
 }
 
 func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
-	c.clientLock.Lock()
+	c.clientLock.RLock()
+	clients := make([]*gostratum.StratumContext, 0, len(c.clients))
 	addresses := make([]string, 0, len(c.clients))
 
 	for _, cl := range c.clients {
 		if !cl.Connected() {
 			continue
 		}
+		clients = append(clients, cl)
+		if cl.WalletAddr != "" {
+			addresses = append(addresses, cl.WalletAddr)
+		}
+	}
+	c.clientLock.RUnlock()
+
+	for _, cl := range clients {
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
 			originalAddr := client.WalletAddr
@@ -108,7 +117,7 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 				return
 			}
 
-			state.bigDiff = CalculateTarget(uint64(template.Block.Header.Bits))
+			netDiff := state.SetNetworkTarget(uint64(template.Block.Header.Bits))
 			header, err := SerializeBlockHeader(template.Block)
 			if err != nil {
 				RecordWorkerError(client.WalletAddr, ErrBadDataFromMiner)
@@ -116,38 +125,38 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 				return
 			}
 
+			initialized := state.InitializeIfNeeded(client.RemoteApp, c.minShareDiff)
+			sendInitialDiff := initialized && !soloMining
+			if sendInitialDiff {
+				sendClientDiff(client, c.minShareDiff)
+			}
+
 			jobId := state.AddJob(template.Block)
-			if !state.initialized {
-				state.initialized = true
-				state.useBigJob = bigJobRegex.MatchString(client.RemoteApp)
-				state.stratumDiff = newCryptixDiff()
-				state.stratumDiff.setDiffValue(c.minShareDiff)
-				if !soloMining {
-					sendClientDiff(client, state)
-				}
+			if initialized {
 				c.shareHandler.setClientVardiff(client, c.minShareDiff)
 			}
 
-			varDiff := TargetToDiff(&state.bigDiff)
-			c.shareHandler.setSoloDiff(varDiff)
+			varDiff := netDiff
+			c.shareHandler.setSoloDiff(netDiff)
 			if !soloMining {
 				varDiff = c.shareHandler.getClientVardiff(client)
 			}
 
+			currentDiff := state.GetStratumDiffValue()
 			if varDiff == 0 {
-				varDiff = state.stratumDiff.diffValue
+				varDiff = currentDiff
 			}
-			if varDiff != state.stratumDiff.diffValue {
+			if varDiff != currentDiff {
 				if !soloMining {
-					client.Logger.Info(fmt.Sprintf("changing diff from %.10f to %.10f", state.stratumDiff.diffValue, varDiff))
+					client.Logger.Info(fmt.Sprintf("changing diff from %.10f to %.10f", currentDiff, varDiff))
 				}
-				state.stratumDiff.setDiffValue(varDiff)
-				sendClientDiff(client, state)
+				state.SetStratumDiff(varDiff)
+				sendClientDiff(client, varDiff)
 				c.shareHandler.startClientVardiff(client)
 			}
 
 			jobParams := []any{fmt.Sprintf("%d", jobId)}
-			if state.useBigJob {
+			if state.GetUseBigJob() {
 				jobParams = append(jobParams, GenerateLargeJobParams(header, uint64(template.Block.Header.Timestamp)))
 			} else {
 				jobParams = append(jobParams, GenerateJobHeader(header))
@@ -171,33 +180,32 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 			RecordNewJob(client)
 			client.WalletAddr = originalAddr
 		}(cl)
+	}
 
-		if cl.WalletAddr != "" {
-			addresses = append(addresses, cl.WalletAddr)
-		}
+	c.clientLock.Lock()
+	shouldCheckBalances := time.Since(c.lastBalanceCheck) > balanceDelay
+	if shouldCheckBalances {
+		c.lastBalanceCheck = time.Now()
 	}
 	c.clientLock.Unlock()
 
-	if time.Since(c.lastBalanceCheck) > balanceDelay {
-		c.lastBalanceCheck = time.Now()
-		if len(addresses) > 0 {
-			go func() {
-				balances, err := kapi.cryptix.GetBalancesByAddresses(addresses)
-				if err != nil {
-					c.logger.Warn("failed to get balances from cryptix, prom stats will be out of date", zap.Error(err))
-					return
-				}
-				RecordBalances(balances)
-			}()
-		}
+	if shouldCheckBalances && len(addresses) > 0 {
+		go func() {
+			balances, err := kapi.cryptix.GetBalancesByAddresses(addresses)
+			if err != nil {
+				c.logger.Warn("failed to get balances from cryptix, prom stats will be out of date", zap.Error(err))
+				return
+			}
+			RecordBalances(balances)
+		}()
 	}
 }
 
-func sendClientDiff(client *gostratum.StratumContext, state *MiningState) {
+func sendClientDiff(client *gostratum.StratumContext, diff float64) {
 	if err := client.Send(gostratum.JsonRpcEvent{
 		Version: "2.0",
 		Method:  "mining.set_difficulty",
-		Params:  []any{state.stratumDiff.diffValue},
+		Params:  []any{diff},
 	}); err != nil {
 		RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
 		client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))

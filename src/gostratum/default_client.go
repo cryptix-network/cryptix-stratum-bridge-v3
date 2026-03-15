@@ -2,7 +2,6 @@ package gostratum
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
 
 	"github.com/cryptix-network/cryptixd/util"
@@ -18,6 +17,7 @@ const (
 	StratumMethodSubscribe StratumMethod = "mining.subscribe"
 	StratumMethodAuthorize StratumMethod = "mining.authorize"
 	StratumMethodSubmit    StratumMethod = "mining.submit"
+	AnonymousWorkerName    string        = "anonymous"
 )
 
 func DefaultLogger() *zap.Logger {
@@ -55,11 +55,14 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	if !ok {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address string")
 	}
-	parts := strings.Split(address, ".")
-	var workerName string
-	if len(parts) >= 2 {
-		address = parts[0]
-		workerName = parts[1]
+	parts := strings.SplitN(address, ".", 2)
+	workerName := AnonymousWorkerName
+	address = parts[0]
+	if len(parts) == 2 {
+		candidate := strings.TrimSpace(parts[1])
+		if candidate != "" {
+			workerName = candidate
+		}
 	}
 	var err error
 	address, err = CleanWallet(address)
@@ -84,7 +87,7 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 
 func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {
 	if err := ctx.Reply(NewResponse(event,
-		[]any{true, "EthereumStratum/1.0.0"}, nil)); err != nil {
+		[]any{true, "CryptixStratum/1.0.0"}, nil)); err != nil {
 		return errors.Wrap(err, "failed to send response to subscribe")
 	}
 	if len(event.Params) > 0 {
@@ -111,33 +114,59 @@ func SendExtranonce(ctx *StratumContext) {
 	}
 }
 
-var walletRegex = regexp.MustCompile("cryptix:[a-z0-9]+")
-var testnetWalletRegex = regexp.MustCompile("cryptixtest:[a-z0-9]+")
-
 func CleanWallet(in string) (string, error) {
-	testnet := strings.HasPrefix(in, "cryptixtest:")
-	prefix := util.Bech32PrefixCryptix
-
-	if testnet {
-		prefix = util.Bech32PrefixCryptixTest
+	candidate := strings.TrimSpace(in)
+	if candidate == "" {
+		return "", errors.New("unable to coerce wallet to valid cryptix address")
 	}
 
-	_, err := util.DecodeAddress(in, prefix)
-	if err == nil {
-		return in, nil // good to go
-	}
-	if !strings.HasPrefix(in, "cryptix:") && !strings.HasPrefix(in, "cryptixtest:") {
-		return CleanWallet("cryptix:" + in)
+	// Some miners append worker info with commas/spaces.
+	if idx := strings.IndexAny(candidate, ",; \t\r\n"); idx >= 0 {
+		candidate = candidate[:idx]
 	}
 
-	// has cryptix: prefix but other weirdness somewhere
-	if walletRegex.MatchString(in) {
-		return in[0:70], nil
+	if strings.HasPrefix(candidate, "cryptix:") {
+		if _, err := util.DecodeAddress(candidate, util.Bech32PrefixCryptix); err == nil {
+			return candidate, nil
+		}
+		if payload := extractAddressPayload(strings.TrimPrefix(candidate, "cryptix:")); payload != "" {
+			return "cryptix:" + payload, nil
+		}
+		return "", errors.New("unable to coerce wallet to valid cryptix address")
 	}
 
-	if testnetWalletRegex.MatchString(in) {
-		return in[0:74], nil
+	if strings.HasPrefix(candidate, "cryptixtest:") {
+		if _, err := util.DecodeAddress(candidate, util.Bech32PrefixCryptixTest); err == nil {
+			return candidate, nil
+		}
+		if payload := extractAddressPayload(strings.TrimPrefix(candidate, "cryptixtest:")); payload != "" {
+			return "cryptixtest:" + payload, nil
+		}
+		return "", errors.New("unable to coerce wallet to valid cryptix address")
+	}
+
+	mainnet := "cryptix:" + candidate
+	if _, err := util.DecodeAddress(mainnet, util.Bech32PrefixCryptix); err == nil {
+		return mainnet, nil
+	}
+	if payload := extractAddressPayload(candidate); payload != "" {
+		return "cryptix:" + payload, nil
+	}
+
+	testnet := "cryptixtest:" + candidate
+	if _, err := util.DecodeAddress(testnet, util.Bech32PrefixCryptixTest); err == nil {
+		return testnet, nil
 	}
 
 	return "", errors.New("unable to coerce wallet to valid cryptix address")
+}
+
+func extractAddressPayload(candidate string) string {
+	for i, r := range candidate {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+			continue
+		}
+		return candidate[:i]
+	}
+	return candidate
 }

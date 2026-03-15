@@ -2,10 +2,10 @@ package cryptixstratum
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"math/big"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -15,7 +15,7 @@ import (
 )
 
 func TestHeaderSerialization(t *testing.T) {
-	raw, err := ioutil.ReadFile("./example_header.json")
+	raw, err := os.ReadFile("./example_header.json")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,6 +77,10 @@ func TestPoolHzCalculation(t *testing.T) {
 
 // snooper. Inspect coms between miner and pool
 func TestBridge(t *testing.T) {
+	if os.Getenv("ENABLE_BRIDGE_SNOOP_TEST") != "1" {
+		t.Skip("set ENABLE_BRIDGE_SNOOP_TEST=1 to run this manual bridge snooper test")
+	}
+
 	serverConn, err := net.Dial("tcp", "pool.us.woolypooly.com:3112")
 	if err != nil {
 		t.Fatal(err)

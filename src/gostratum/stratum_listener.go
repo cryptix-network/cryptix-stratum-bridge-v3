@@ -6,6 +6,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	stdatomic "sync/atomic"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -36,7 +37,7 @@ type StratumListenerConfig struct {
 
 type StratumListener struct {
 	StratumListenerConfig
-	shuttingDown      bool
+	shuttingDown      stdatomic.Bool
 	disconnectChannel DisconnectChannel
 	stats             StratumStats
 	workerGroup       sync.WaitGroup
@@ -46,7 +47,7 @@ func NewListener(cfg StratumListenerConfig) *StratumListener {
 	listener := &StratumListener{
 		StratumListenerConfig: cfg,
 		workerGroup:           sync.WaitGroup{},
-		disconnectChannel:     make(DisconnectChannel),
+		disconnectChannel:     make(DisconnectChannel, 1024),
 	}
 
 	listener.Logger = listener.Logger.With(
@@ -63,7 +64,7 @@ func NewListener(cfg StratumListenerConfig) *StratumListener {
 }
 
 func (s *StratumListener) Listen(ctx context.Context) error {
-	s.shuttingDown = false
+	s.shuttingDown.Store(false)
 
 	serverContext, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -75,12 +76,13 @@ func (s *StratumListener) Listen(ctx context.Context) error {
 	}
 	defer server.Close()
 
+	s.workerGroup.Add(2)
 	go s.disconnectListener(serverContext)
 	go s.tcpListener(serverContext, server)
 
 	// block here until the context is killed
 	<-ctx.Done() // context cancelled, so kill the server
-	s.shuttingDown = true
+	s.shuttingDown.Store(true)
 	server.Close()
 	s.workerGroup.Wait()
 	return context.Canceled
@@ -120,13 +122,15 @@ func (s *StratumListener) HandleEvent(ctx *StratumContext, event JsonRpcEvent) e
 }
 
 func (s *StratumListener) disconnectListener(ctx context.Context) {
-	s.workerGroup.Add(1)
 	defer s.workerGroup.Done()
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case client := <-s.disconnectChannel:
+		case client, ok := <-s.disconnectChannel:
+			if !ok {
+				return
+			}
 			s.Logger.Info(fmt.Sprintf("client disconnecting - %s", client.RemoteAddr))
 			s.stats.Disconnects++
 			if s.ClientListener != nil {
@@ -137,12 +141,11 @@ func (s *StratumListener) disconnectListener(ctx context.Context) {
 }
 
 func (s *StratumListener) tcpListener(ctx context.Context, server net.Listener) {
-	s.workerGroup.Add(1)
 	defer s.workerGroup.Done()
 	for { // listen and spin forever
 		connection, err := server.Accept()
 		if err != nil {
-			if s.shuttingDown {
+			if s.shuttingDown.Load() {
 				s.Logger.Error("stopping listening due to server shutdown")
 				return
 			}

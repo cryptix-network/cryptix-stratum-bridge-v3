@@ -1,7 +1,6 @@
 package cryptixstratum
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 
@@ -37,10 +36,15 @@ var blockCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Help: "Number of blocks mined over time",
 }, workerLabels)
 
-var blockGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name: "py_mined_blocpy_gauge",
-	Help: "Gauge containing 1 unique instance per block mined",
-}, append(workerLabels, "nonce", "bluescore", "hash"))
+var lastBlockNonceGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "py_last_mined_block_nonce",
+	Help: "Most recent nonce submitted for an accepted block by worker",
+}, workerLabels)
+
+var lastBlockBlueScoreGauge = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "py_last_mined_block_bluescore",
+	Help: "Most recent blue score for an accepted block by worker",
+}, workerLabels)
 
 var disconnectCounter = promauto.NewCounterVec(prometheus.CounterOpts{
 	Name: "py_worker_disconnect_counter",
@@ -115,13 +119,11 @@ func RecordWeakShare(worker *gostratum.StratumContext) {
 	invalidCounter.With(labels).Inc()
 }
 
-func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64, hash string) {
+func RecordBlockFound(worker *gostratum.StratumContext, nonce, bluescore uint64) {
 	blockCounter.With(commonLabels(worker)).Inc()
 	labels := commonLabels(worker)
-	labels["nonce"] = fmt.Sprintf("%d", nonce)
-	labels["bluescore"] = fmt.Sprintf("%d", bluescore)
-	labels["hash"] = fmt.Sprintf("%s", hash)
-	blockGauge.With(labels).Set(1)
+	lastBlockNonceGauge.With(labels).Set(float64(nonce))
+	lastBlockBlueScoreGauge.With(labels).Set(float64(bluescore))
 }
 
 func RecordDisconnect(worker *gostratum.StratumContext) {
@@ -188,9 +190,10 @@ func StartPromServer(log *zap.SugaredLogger, port string) {
 	go func() { // prom http handler, separate from the main router
 		promInit.Do(func() {
 			logger := log.With(zap.String("server", "prometheus"))
-			http.Handle("/metrics", promhttp.Handler())
+			mux := http.NewServeMux()
+			mux.Handle("/metrics", promhttp.Handler())
 			logger.Info("hosting prom stats on ", port, "/metrics")
-			if err := http.ListenAndServe(port, nil); err != nil {
+			if err := http.ListenAndServe(port, mux); err != nil {
 				logger.Error("error serving prom metrics", zap.Error(err))
 			}
 		})

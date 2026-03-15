@@ -3,7 +3,6 @@ package cryptixstratum
 import (
 	"context"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"time"
 
@@ -74,10 +73,15 @@ func ListenAndServe(cfg BridgeConfig) error {
 
 	if cfg.HealthCheckPort != "" {
 		logger.Info("enabling health check on port " + cfg.HealthCheckPort)
-		http.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
+		healthMux := http.NewServeMux()
+		healthMux.HandleFunc("/readyz", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})
-		go http.ListenAndServe(cfg.HealthCheckPort, nil)
+		go func() {
+			if err := http.ListenAndServe(cfg.HealthCheckPort, healthMux); err != nil {
+				logger.Warn("health check server stopped", zap.Error(err))
+			}
+		}()
 	}
 
 	shareHandler := newShareHandler(pyApi.cryptix)

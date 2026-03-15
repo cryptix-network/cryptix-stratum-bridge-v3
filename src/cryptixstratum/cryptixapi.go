@@ -43,6 +43,7 @@ func (py *cryptixApi) Start(ctx context.Context, blockCb func()) {
 
 func (py *cryptixApi) startStatsThread(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
@@ -99,15 +100,19 @@ func (s *cryptixApi) waitForSync(verbose bool) error {
 }
 
 func (s *cryptixApi) startBlockTemplateListener(ctx context.Context, blockReadyCb func()) {
-	blockReadyChan := make(chan bool)
+	blockReadyChan := make(chan bool, 1)
 	err := s.cryptix.RegisterForNewBlockTemplateNotifications(func(_ *appmessage.NewBlockTemplateNotificationMessage) {
-		blockReadyChan <- true
+		select {
+		case blockReadyChan <- true:
+		default:
+		}
 	})
 	if err != nil {
 		s.logger.Error("fatal: failed to register for block notifications from cryptix")
 	}
 
 	ticker := time.NewTicker(s.blockWaitTime)
+	defer ticker.Stop()
 	for {
 		if err := s.waitForSync(false); err != nil {
 			s.logger.Error("error checking cryptix sync state, attempting reconnect: ", err)
