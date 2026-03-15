@@ -92,10 +92,12 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 		if !cl.Connected() {
 			continue
 		}
-		clients = append(clients, cl)
-		if cl.WalletAddr != "" {
-			addresses = append(addresses, cl.WalletAddr)
+		if cl.WalletAddr == "" {
+			// Wait until the miner has authorized before assigning work.
+			continue
 		}
+		clients = append(clients, cl)
+		addresses = append(addresses, cl.WalletAddr)
 	}
 	c.clientLock.RUnlock()
 
@@ -103,6 +105,7 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 		go func(client *gostratum.StratumContext) {
 			state := GetMiningState(client)
 			originalAddr := client.WalletAddr
+			c.shareHandler.getCreateStats(client)
 
 			template, err := kapi.GetBlockTemplate(client)
 			if err != nil {
@@ -126,14 +129,12 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 			}
 
 			initialized := state.InitializeIfNeeded(client.RemoteApp, c.minShareDiff)
-			sendInitialDiff := initialized && !soloMining
-			if sendInitialDiff {
-				sendClientDiff(client, c.minShareDiff)
-			}
-
-			jobId := state.AddJob(template.Block)
 			if initialized {
 				c.shareHandler.setClientVardiff(client, c.minShareDiff)
+			}
+			sendInitialDiff := initialized && !soloMining && !client.IsSV2()
+			if sendInitialDiff {
+				sendClientDiff(client, c.minShareDiff)
 			}
 
 			varDiff := netDiff
@@ -151,8 +152,49 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 					client.Logger.Info(fmt.Sprintf("changing diff from %.10f to %.10f", currentDiff, varDiff))
 				}
 				state.SetStratumDiff(varDiff)
-				sendClientDiff(client, varDiff)
+				if client.IsSV2() {
+					if err := sendSV2Target(client, varDiff); err != nil {
+						if errors.Is(err, gostratum.ErrorDisconnected) {
+							RecordWorkerError(client.WalletAddr, ErrDisconnected)
+							return
+						}
+						RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
+						client.Logger.Error(errors.Wrap(err, "failed sending sv2 difficulty target").Error())
+						client.Disconnect()
+						return
+					}
+				} else {
+					sendClientDiff(client, varDiff)
+				}
 				c.shareHandler.startClientVardiff(client)
+			} else if client.IsSV2() {
+				if err := sendSV2Target(client, varDiff); err != nil {
+					if errors.Is(err, gostratum.ErrorDisconnected) {
+						RecordWorkerError(client.WalletAddr, ErrDisconnected)
+						return
+					}
+					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
+					client.Logger.Error(errors.Wrap(err, "failed sending sv2 difficulty target").Error())
+					client.Disconnect()
+					return
+				}
+			}
+
+			jobId := state.AddJob(template.Block)
+			if client.IsSV2() {
+				if err := sendSV2Job(client, uint32(jobId), header, uint32(template.Block.Header.Version), uint64(template.Block.Header.Timestamp), uint32(template.Block.Header.Bits)); err != nil {
+					if errors.Is(err, gostratum.ErrorDisconnected) {
+						RecordWorkerError(client.WalletAddr, ErrDisconnected)
+						return
+					}
+					RecordWorkerError(client.WalletAddr, ErrFailedSendWork)
+					client.Logger.Error(errors.Wrapf(err, "failed sending sv2 work packet %d", jobId).Error())
+					client.Disconnect()
+					return
+				}
+				RecordNewJob(client)
+				client.WalletAddr = originalAddr
+				return
 			}
 
 			jobParams := []any{fmt.Sprintf("%d", jobId)}
@@ -211,4 +253,25 @@ func sendClientDiff(client *gostratum.StratumContext, diff float64) {
 		client.Logger.Error(errors.Wrap(err, "failed sending difficulty").Error(), zap.Any("context", client))
 		return
 	}
+}
+
+func sendSV2Target(client *gostratum.StratumContext, diff float64) error {
+	target := diffToSV2TargetLE(diff)
+	return writeSV2Frame(client, sv2ExtChannel, sv2MsgSetTarget, encodeSV2SetTargetPayload(client.SV2ChannelID(), target))
+}
+
+func sendSV2Job(client *gostratum.StratumContext, jobID uint32, prePowHash []byte, version uint32, timestampMs uint64, nBits uint32) error {
+	prePowHash32, err := bytesToFixed32(prePowHash)
+	if err != nil {
+		return err
+	}
+
+	if err := writeSV2Frame(client, sv2ExtChannel, sv2MsgNewMiningJob, encodeSV2NewMiningJobPayload(client.SV2ChannelID(), jobID, version, prePowHash32)); err != nil {
+		return err
+	}
+
+	// cryptis-miner resolves all-zero prevhash using the remembered NewMiningJob pre-pow hash.
+	var zeroPrevHash [32]byte
+	minNTime := uint32(timestampMs / 1000)
+	return writeSV2Frame(client, sv2ExtChannel, sv2MsgSetNewPrevHash, encodeSV2SetNewPrevHashPayload(client.SV2ChannelID(), jobID, zeroPrevHash, minNTime, nBits))
 }

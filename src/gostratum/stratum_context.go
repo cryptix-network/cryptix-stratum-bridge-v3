@@ -23,6 +23,8 @@ type StratumContext struct {
 	Logger        *zap.Logger
 	connection    net.Conn
 	disconnecting atomic.Bool
+	sv2Enabled    atomic.Bool
+	sv2ChannelID  atomic.Uint32
 	onDisconnect  chan *StratumContext
 	State         any // gross, but go generics aren't mature enough this can be typed 😭
 	writeLock     int32
@@ -40,6 +42,24 @@ var ErrorDisconnected = fmt.Errorf("disconnecting")
 
 func (sc *StratumContext) Connected() bool {
 	return !sc.disconnecting.Load()
+}
+
+func (sc *StratumContext) EnableSV2(channelID uint32) {
+	sc.sv2Enabled.Store(true)
+	sc.sv2ChannelID.Store(channelID)
+}
+
+func (sc *StratumContext) DisableSV2() {
+	sc.sv2Enabled.Store(false)
+	sc.sv2ChannelID.Store(0)
+}
+
+func (sc *StratumContext) IsSV2() bool {
+	return sc.sv2Enabled.Load()
+}
+
+func (sc *StratumContext) SV2ChannelID() uint32 {
+	return sc.sv2ChannelID.Load()
 }
 
 func (sc *StratumContext) Summary() ContextSummary {
@@ -92,6 +112,13 @@ func (sc *StratumContext) Send(event JsonRpcEvent) error {
 	}
 	encoded = append(encoded, '\n')
 	return sc.writeWithBackoff(encoded)
+}
+
+func (sc *StratumContext) WriteRaw(data []byte) error {
+	if sc.disconnecting.Load() {
+		return ErrorDisconnected
+	}
+	return sc.writeWithBackoff(data)
 }
 
 var errWriteBlocked = fmt.Errorf("error writing to socket, previous write pending")

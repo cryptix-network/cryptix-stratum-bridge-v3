@@ -23,7 +23,10 @@ func main() {
 		log.Printf("config file not found: %s", err)
 		os.Exit(1)
 	}
-	cfg := cryptixstratum.BridgeConfig{}
+	cfg := cryptixstratum.BridgeConfig{
+		StratumV2Port:     ":5556",
+		StratumV2Fallback: false,
+	}
 	if err := yaml.Unmarshal(rawCfg, &cfg); err != nil {
 		log.Printf("failed parsing config file: %s", err)
 		os.Exit(1)
@@ -38,6 +41,9 @@ func main() {
 	}
 
 	flag.StringVar(&cfg.StratumPort, "stratum", cfg.StratumPort, "stratum port to listen on, default `:5555`")
+	flag.BoolVar(&cfg.StratumV2Enabled, "stratumv2", cfg.StratumV2Enabled, "enable optional Stratum V2 listener")
+	flag.StringVar(&cfg.StratumV2Port, "stratumv2port", cfg.StratumV2Port, "stratum v2 port to listen on when -stratumv2 is enabled")
+	flag.BoolVar(&cfg.StratumV2Fallback, "stratumv2fallback", cfg.StratumV2Fallback, "when true, v2 listener allows v1 fallback on the v2 port")
 	flag.BoolVar(&cfg.PrintStats, "stats", cfg.PrintStats, "true to show periodic stats to console, default `true`")
 	flag.StringVar(&cfg.RPCServer, "cryptix", cfg.RPCServer, "address of the cryptix node, default `localhost:13110`")
 	flag.DurationVar(&cfg.BlockWaitTime, "blockwait", cfg.BlockWaitTime, "time in ms to wait before manually requesting new block, default `500`")
@@ -63,6 +69,9 @@ func main() {
 	log.Printf("initializing bridge")
 	log.Printf("\tcryptix:          %s", cfg.RPCServer)
 	log.Printf("\tstratum:         %s", cfg.StratumPort)
+	log.Printf("\tstratum v2:      %t", cfg.StratumV2Enabled)
+	log.Printf("\tstratum v2 port: %s", cfg.StratumV2Port)
+	log.Printf("\tv2 fallback v1:  %t", cfg.StratumV2Fallback)
 	log.Printf("\tprom:            %s", cfg.PromPort)
 	log.Printf("\tstats:           %t", cfg.PrintStats)
 	log.Printf("\tlog:             %t", cfg.UseLogFile)

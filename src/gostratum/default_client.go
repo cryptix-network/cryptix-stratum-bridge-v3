@@ -51,21 +51,11 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 	if len(event.Params) < 1 {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address")
 	}
-	address, ok := event.Params[0].(string)
+	identity, ok := event.Params[0].(string)
 	if !ok {
 		return fmt.Errorf("malformed event from miner, expected param[1] to be address string")
 	}
-	parts := strings.SplitN(address, ".", 2)
-	workerName := AnonymousWorkerName
-	address = parts[0]
-	if len(parts) == 2 {
-		candidate := strings.TrimSpace(parts[1])
-		if candidate != "" {
-			workerName = candidate
-		}
-	}
-	var err error
-	address, err = CleanWallet(address)
+	address, workerName, err := ParseAuthorizeIdentity(identity)
 	if err != nil {
 		return fmt.Errorf("invalid wallet format %s: %w", address, err)
 	}
@@ -83,6 +73,24 @@ func HandleAuthorize(ctx *StratumContext, event JsonRpcEvent) error {
 
 	ctx.Logger.Info(fmt.Sprintf("client authorized, address: %s", ctx.WalletAddr))
 	return nil
+}
+
+func ParseAuthorizeIdentity(identity string) (wallet string, workerName string, err error) {
+	parts := strings.SplitN(identity, ".", 2)
+	workerName = AnonymousWorkerName
+	address := parts[0]
+	if len(parts) == 2 {
+		candidate := strings.TrimSpace(parts[1])
+		if candidate != "" {
+			workerName = candidate
+		}
+	}
+
+	wallet, err = CleanWallet(address)
+	if err != nil {
+		return "", "", err
+	}
+	return wallet, workerName, nil
 }
 
 func HandleSubscribe(ctx *StratumContext, event JsonRpcEvent) error {

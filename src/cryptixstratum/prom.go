@@ -82,8 +82,12 @@ var networkBlockCount = promauto.NewGauge(prometheus.GaugeOpts{
 })
 
 func commonLabels(worker *gostratum.StratumContext) prometheus.Labels {
+	workerName := worker.WorkerName
+	if workerName == "" {
+		workerName = gostratum.AnonymousWorkerName
+	}
 	return prometheus.Labels{
-		"worker": worker.WorkerName,
+		"worker": workerName,
 		"miner":  worker.RemoteApp,
 		"wallet": worker.WalletAddr,
 		"ip":     worker.RemoteAddr,

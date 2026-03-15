@@ -125,7 +125,7 @@ func validateSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent)
 	block, exists := state.GetJob(int(jobId))
 	if !exists {
 		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
-		return nil, fmt.Errorf("job does not exist. stale?")
+		return nil, errors.Wrap(ErrStaleShare, "job does not exist")
 	}
 	noncestr, ok := event.Params[2].(string)
 	if !ok {
@@ -145,6 +145,16 @@ var (
 	ErrDupeShare  = fmt.Errorf("duplicate share")
 )
 
+type SubmitStatus int
+
+const (
+	SubmitStatusAccepted SubmitStatus = iota
+	SubmitStatusStale
+	SubmitStatusDuplicate
+	SubmitStatusLowDiff
+	SubmitStatusBad
+)
+
 // the max difference between tip blue score and job blue score that we'll accept
 // anything greater than this is considered a stale
 const workWindow = 8
@@ -153,6 +163,9 @@ const maxTrackedSharesPerWorker = 2048
 func workerStatsKey(ctx *gostratum.StratumContext) string {
 	if ctx.WorkerName != "" && ctx.WorkerName != gostratum.AnonymousWorkerName {
 		return ctx.WorkerName
+	}
+	if ctx.WalletAddr != "" {
+		return ctx.WalletAddr + "#" + gostratum.AnonymousWorkerName
 	}
 	return ctx.RemoteAddr
 }
@@ -234,32 +247,98 @@ func (sh *shareHandler) clearClientDupeHistory(ctx *gostratum.StratumContext) {
 	sh.dupeLock.Lock()
 	defer sh.dupeLock.Unlock()
 	delete(sh.dupeShares, ctx.RemoteAddr)
-	if ctx.WorkerName != "" {
-		delete(sh.dupeShares, ctx.WorkerName)
-	}
+	delete(sh.dupeShares, ctx.WorkerName)
+	delete(sh.dupeShares, workerStatsKey(ctx))
 }
 
 func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostratum.JsonRpcEvent, soloMining bool) error {
 	submitInfo, err := validateSubmit(ctx, event)
 	if err != nil {
-		return err
+		if errors.Is(err, ErrStaleShare) {
+			stats := sh.getCreateStats(ctx)
+			stats.StaleShares.Add(1)
+			sh.overall.StaleShares.Add(1)
+			RecordStaleShare(ctx)
+			return sh.replySubmitStatusV1(ctx, event.Id, SubmitStatusStale)
+		}
+		ctx.Logger.Warn("malformed submit payload", zap.Error(err))
+		return sh.replySubmitStatusV1(ctx, event.Id, SubmitStatusBad)
 	}
 
-	// add extranonce to noncestr if enabled and submitted nonce is shorter than
-	// expected (16 - <extranonce length> characters)
+	submitInfo.nonceVal, err = parseV1SubmitNonce(ctx, submitInfo.noncestr)
+	if err != nil {
+		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
+		ctx.Logger.Warn("invalid submit nonce", zap.Error(err))
+		return sh.replySubmitStatusV1(ctx, event.Id, SubmitStatusBad)
+	}
+	submitInfo.noncestr = fmt.Sprintf("%016x", submitInfo.nonceVal)
+
+	status, err := sh.processSubmit(ctx, submitInfo, soloMining)
+	if err != nil {
+		return err
+	}
+	return sh.replySubmitStatusV1(ctx, event.Id, status)
+}
+
+func (sh *shareHandler) HandleSubmitSV2(ctx *gostratum.StratumContext, jobID uint32, nonce uint64, soloMining bool) (SubmitStatus, error) {
+	state := GetMiningState(ctx)
+	block, exists := state.GetJob(int(jobID))
+	if !exists {
+		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
+		stats := sh.getCreateStats(ctx)
+		stats.StaleShares.Add(1)
+		sh.overall.StaleShares.Add(1)
+		RecordStaleShare(ctx)
+		return SubmitStatusStale, nil
+	}
+
+	submitInfo := &submitInfo{
+		block:    block,
+		state:    state,
+		jobID:    int(jobID),
+		noncestr: fmt.Sprintf("%016x", nonce),
+		nonceVal: nonce,
+	}
+	return sh.processSubmit(ctx, submitInfo, soloMining)
+}
+
+func parseV1SubmitNonce(ctx *gostratum.StratumContext, nonceStr string) (uint64, error) {
+	normalized := nonceStr
+
+	// add extranonce to submitted nonce if the miner only sent extranonce2
 	if ctx.Extranonce != "" {
 		extranonce2Len := 16 - len(ctx.Extranonce)
-		if len(submitInfo.noncestr) <= extranonce2Len {
-			submitInfo.noncestr = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, submitInfo.noncestr)
+		if extranonce2Len > 0 && len(normalized) <= extranonce2Len {
+			normalized = ctx.Extranonce + fmt.Sprintf("%0*s", extranonce2Len, normalized)
 		}
 	}
 
-	//ctx.Logger.Debug(submitInfo.block.Header.BlueScore, " submit ", submitInfo.noncestr)
-	submitInfo.nonceVal, err = strconv.ParseUint(submitInfo.noncestr, 16, 64)
+	nonceVal, err := strconv.ParseUint(normalized, 16, 64)
 	if err != nil {
-		RecordWorkerError(ctx.WalletAddr, ErrBadDataFromMiner)
-		return errors.Wrap(err, "failed parsing noncestr")
+		return 0, errors.Wrap(err, "failed parsing noncestr")
 	}
+	return nonceVal, nil
+}
+
+func (sh *shareHandler) replySubmitStatusV1(ctx *gostratum.StratumContext, eventID any, status SubmitStatus) error {
+	switch status {
+	case SubmitStatusAccepted:
+		return ctx.Reply(gostratum.JsonRpcResponse{
+			Id:     eventID,
+			Result: true,
+		})
+	case SubmitStatusStale:
+		return ctx.ReplyStaleShare(eventID)
+	case SubmitStatusDuplicate:
+		return ctx.ReplyDupeShare(eventID)
+	case SubmitStatusLowDiff:
+		return ctx.ReplyLowDiffShare(eventID)
+	default:
+		return ctx.ReplyBadShare(eventID)
+	}
+}
+
+func (sh *shareHandler) processSubmit(ctx *gostratum.StratumContext, submitInfo *submitInfo, soloMining bool) (SubmitStatus, error) {
 	stats := sh.getCreateStats(ctx)
 	if err := sh.checkStales(ctx, submitInfo); err != nil {
 		if errors.Is(err, ErrDupeShare) {
@@ -267,22 +346,22 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 			RecordDupeShare(ctx)
 			stats.InvalidShares.Add(1)
 			sh.overall.InvalidShares.Add(1)
-			return ctx.ReplyDupeShare(event.Id)
-		} else if errors.Is(err, ErrStaleShare) {
+			return SubmitStatusDuplicate, nil
+		}
+		if errors.Is(err, ErrStaleShare) {
 			ctx.Logger.Warn("stale share")
 			stats.StaleShares.Add(1)
 			sh.overall.StaleShares.Add(1)
 			RecordStaleShare(ctx)
-			return ctx.ReplyStaleShare(event.Id)
+			return SubmitStatusStale, nil
 		}
-		// unknown error somehow
-		ctx.Logger.Error("unknown error during check stales")
-		return ctx.ReplyBadShare(event.Id)
+		ctx.Logger.Error("unknown error during stale/duplicate checks", zap.Error(err))
+		return SubmitStatusBad, nil
 	}
 
 	converted, err := appmessage.RPCBlockToDomainBlock(submitInfo.block)
 	if err != nil {
-		return fmt.Errorf("failed to cast block to mutable block: %+v", err)
+		return SubmitStatusBad, fmt.Errorf("failed to cast block to mutable block: %+v", err)
 	}
 	mutableHeader := converted.Header.ToMutable()
 	mutableHeader.SetNonce(submitInfo.nonceVal)
@@ -292,13 +371,17 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	shareHashValue, shareTarget, _ := submitInfo.state.GetStratumDiffSnapshot()
 	if shareTarget == nil {
 		RecordWorkerError(ctx.WalletAddr, ErrMissingJob)
-		return fmt.Errorf("mining state is not initialized for client")
+		return SubmitStatusBad, fmt.Errorf("mining state is not initialized for client")
 	}
 
 	// The block hash must be less or equal than the claimed target.
 	if powValue.Cmp(&powState.Target) <= 0 {
-		if err := sh.submit(ctx, converted, submitInfo.nonceVal, event.Id); err != nil {
-			return err
+		status, err := sh.submitBlock(ctx, converted, submitInfo.nonceVal)
+		if err != nil {
+			return status, err
+		}
+		if status != SubmitStatusAccepted {
+			return status, nil
 		}
 	} else if powValue.Cmp(shareTarget) >= 0 {
 		if soloMining {
@@ -306,22 +389,10 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 		} else {
 			ctx.Logger.Warn("weak share")
 		}
-
-		// prePowHashHex := strings.Repeat("00", 32) // 32 bytes of zero
-
-		// zeroes := strings.Repeat("00", 32) // 32 bytes of zero
-
-		// ctx.Logger.Warn(fmt.Sprintf("Net Target: %s\n", powState.Target.String()))
-		// ctx.Logger.Warn(fmt.Sprintf("Stratum Target: %s\n", state.stratumDiff.targetValue.String()))
-		// ctx.Logger.Warn(fmt.Sprintf("Stratum Target Hex: %064x\n", state.stratumDiff.targetValue.Bytes()))
-		// ctx.Logger.Warn(fmt.Sprintf("Blob: %s%016x%s%016x", prePowHashHex, powState.Timestamp, zeroes, powState.Nonce))
-		// ctx.Logger.Warn(fmt.Sprintf("Nonce: %d\n", submitInfo.nonceVal))
-		// ctx.Logger.Warn(fmt.Sprintf("Nonce Hex: %016x\n", submitInfo.nonceVal))
-		// ctx.Logger.Warn(fmt.Sprintf("PowValue: %064x\n", powValue.Bytes()))
 		stats.InvalidShares.Add(1)
 		sh.overall.InvalidShares.Add(1)
 		RecordWeakShare(ctx)
-		return ctx.ReplyLowDiffShare(event.Id)
+		return SubmitStatusLowDiff, nil
 	}
 
 	stats.SharesFound.Add(1)
@@ -330,15 +401,10 @@ func (sh *shareHandler) HandleSubmit(ctx *gostratum.StratumContext, event gostra
 	stats.LastShare = time.Now()
 	sh.overall.SharesFound.Add(1)
 	RecordShareFound(ctx, shareHashValue)
-
-	return ctx.Reply(gostratum.JsonRpcResponse{
-		Id:     event.Id,
-		Result: true,
-	})
+	return SubmitStatusAccepted, nil
 }
 
-func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
-	block *externalapi.DomainBlock, nonce uint64, eventId any) error {
+func (sh *shareHandler) submitBlock(ctx *gostratum.StratumContext, block *externalapi.DomainBlock, nonce uint64) (SubmitStatus, error) {
 	mutable := block.Header.ToMutable()
 	mutable.SetNonce(nonce)
 	block = &externalapi.DomainBlock{
@@ -354,18 +420,18 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 		// :'(
 		if strings.Contains(err.Error(), "ErrDuplicateBlock") {
 			ctx.Logger.Warn("block rejected, stale")
-			// stale
-			sh.getCreateStats(ctx).StaleShares.Add(1)
+			stats := sh.getCreateStats(ctx)
+			stats.StaleShares.Add(1)
 			sh.overall.StaleShares.Add(1)
 			RecordStaleShare(ctx)
-			return ctx.ReplyStaleShare(eventId)
-		} else {
-			ctx.Logger.Warn("block rejected, unknown issue (probably bad pow", zap.Error(err))
-			sh.getCreateStats(ctx).InvalidShares.Add(1)
-			sh.overall.InvalidShares.Add(1)
-			RecordInvalidShare(ctx)
-			return ctx.ReplyBadShare(eventId)
+			return SubmitStatusStale, nil
 		}
+		ctx.Logger.Warn("block rejected, unknown issue (probably bad pow)", zap.Error(err))
+		stats := sh.getCreateStats(ctx)
+		stats.InvalidShares.Add(1)
+		sh.overall.InvalidShares.Add(1)
+		RecordInvalidShare(ctx)
+		return SubmitStatusBad, nil
 	}
 
 	// :)
@@ -375,9 +441,7 @@ func (sh *shareHandler) submit(ctx *gostratum.StratumContext,
 	sh.overall.BlocksFound.Add(1)
 	RecordBlockFound(ctx, block.Header.Nonce(), block.Header.BlueScore())
 
-	// nil return allows HandleSubmit to record share (blocks are shares too!) and
-	// handle the response to the client
-	return nil
+	return SubmitStatusAccepted, nil
 }
 
 func (sh *shareHandler) startStatsThread() error {

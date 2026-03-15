@@ -3,10 +3,12 @@ package gostratum
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"sync"
 	stdatomic "sync/atomic"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.uber.org/zap"
@@ -21,6 +23,11 @@ type StratumClientListener interface {
 	OnDisconnect(ctx *StratumContext)
 }
 
+type BinaryClientHandler interface {
+	CanHandleFirstByte(firstByte byte) bool
+	HandleBinaryClient(ctx *StratumContext, connection net.Conn) error
+}
+
 type StratumHandlerMap map[string]EventHandler
 
 type StratumStats struct {
@@ -31,6 +38,7 @@ type StratumListenerConfig struct {
 	Logger         *zap.Logger
 	HandlerMap     StratumHandlerMap
 	ClientListener StratumClientListener
+	BinaryHandler  BinaryClientHandler
 	StateGenerator StateGenerator
 	Port           string
 }
@@ -109,7 +117,29 @@ func (s *StratumListener) newClient(ctx context.Context, connection net.Conn) {
 		s.ClientListener.OnConnect(clientContext)
 	}
 
-	go spawnClientListener(clientContext, connection, s)
+	routeConn := connection
+	if s.BinaryHandler != nil {
+		firstByte, prefixedConn, err := sniffConnectionPrefix(connection)
+		if err != nil {
+			s.Logger.Warn("failed peeking first byte for protocol detection", zap.Error(err))
+			clientContext.Disconnect()
+			return
+		}
+		routeConn = prefixedConn
+		if s.BinaryHandler.CanHandleFirstByte(firstByte) {
+			go func() {
+				if err := s.BinaryHandler.HandleBinaryClient(clientContext, routeConn); err != nil {
+					if errors.Is(err, ErrorDisconnected) {
+						return
+					}
+					clientContext.Logger.Error("binary client handler failed", zap.Error(err))
+				}
+			}()
+			return
+		}
+	}
+
+	go spawnClientListener(clientContext, routeConn, s)
 
 }
 
@@ -154,4 +184,35 @@ func (s *StratumListener) tcpListener(ctx context.Context, server net.Listener) 
 		}
 		s.newClient(ctx, connection)
 	}
+}
+
+type prefixedConn struct {
+	net.Conn
+	prefix []byte
+}
+
+func (pc *prefixedConn) Read(p []byte) (int, error) {
+	if len(pc.prefix) > 0 {
+		n := copy(p, pc.prefix)
+		pc.prefix = pc.prefix[n:]
+		return n, nil
+	}
+	return pc.Conn.Read(p)
+}
+
+func sniffConnectionPrefix(connection net.Conn) (byte, net.Conn, error) {
+	if err := connection.SetReadDeadline(time.Now().Add(5 * time.Second)); err != nil {
+		return 0, nil, err
+	}
+	defer connection.SetReadDeadline(time.Time{})
+
+	peek := make([]byte, 1)
+	if _, err := io.ReadFull(connection, peek); err != nil {
+		return 0, nil, err
+	}
+
+	return peek[0], &prefixedConn{
+		Conn:   connection,
+		prefix: peek,
+	}, nil
 }

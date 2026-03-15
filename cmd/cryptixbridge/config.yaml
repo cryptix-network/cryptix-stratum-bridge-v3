@@ -3,6 +3,17 @@
 # Note `:PORT` format is needed if not specifiying a specific ip range
 stratum_port: :5555
 
+# stratum_v2_enabled: if true, enables a dedicated Stratum V2 listener on
+# stratum_v2_port while keeping Stratum V1 active on stratum_port.
+stratum_v2_enabled: false
+
+# Note `:PORT` format is needed if not specifiying a specific ip range
+stratum_v2_port: :5556
+
+# stratum_v2_fallback_to_v1: if true, non-v2 traffic on the v2 port falls
+# through to the v1 parser. Usually false when you want strict separation.
+stratum_v2_fallback_to_v1: false
+
 # cryptix_address: address/port of the rpc server for cryptix, typically 13110
 # For a list of public nodes, run `nslookup mainnet-dnsseed.daglabs-dev.com`
 # uncomment for to use a public node
