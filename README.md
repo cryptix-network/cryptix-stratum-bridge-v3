@@ -12,12 +12,6 @@ Here is a lightfull Browser Interface:
 [Cryptix Stratum Browser](https://github.com/cryptix-network/cryptix-stratum-bridge-browser-monitor)
 ## Mining
 
-You can use SRB Miner, its supported for Cryptix and the Bridge/ Pools:
-[SRB Miner](https://github.com/doktor83/SRBMiner-Multi/releases)
-
-For local Node, http Node or Pool Mining you can use:
-[Cryptix-Miner](https://github.com/cryptix-network/cryptix-miner)
-
 
 ## Hive Setup
 [detailed instructions here](hive-setup.md) 
