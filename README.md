@@ -10,6 +10,7 @@ cryptix node using stratum-base miners.
 Supported Mining Software:
 
 Nvidia,Intel, AMD: https://github.com/cryptix-network/cryptis-miner
+
 Nvidia: https://github.com/OneZeroMiner/onezerominer
 
 ## Browser Interface
