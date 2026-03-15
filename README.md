@@ -24,16 +24,6 @@ Shares-based work allocation with miner-like periodic stat output:
 ![image](https://user-images.githubusercontent.com/59971111/191983487-479e19ec-a8cb-4edb-afc4-55a1165e79fc.png)
 
 
-
-Optional monitoring UI:
-
-https://github.com/Cryptix/cryptix-stratum-bridge/blob/main/monitoring-setup.md
-
-![image](https://user-images.githubusercontent.com/59971111/192025446-f20d74a5-f9e0-4290-b98b-9f56af8f23b4.png)
-
-![image](https://user-images.githubusercontent.com/59971111/191980688-2d0faf6b-d551-4880-a316-de2303cfeb7d.png)
-
-
 Prometheus API:
 
 If the app is run with the `-prom={port}` flag the application will host stats on the port specified by `{port}`, these stats are documented in the file [prom.go](src/cryptixstratum/prom.go). This is intended to be use by prometheus but the stats can be fetched and used independently if desired. `curl http://localhost:2114/metrics | grep py_` will get a listing of current stats. All published stats have a `py_` prefix for ease of use.
