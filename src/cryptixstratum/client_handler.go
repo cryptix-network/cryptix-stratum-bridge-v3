@@ -16,7 +16,11 @@ import (
 
 var bigJobRegex = regexp.MustCompile(".*BzMiner.*")
 
-const balanceDelay = time.Minute
+const (
+	balanceDelay   = time.Minute
+	sv2NTimeMsTag  = uint32(0x4D53_0000)
+	sv2NTimeMsMask = uint32(0x0000_03FF)
+)
 
 type clientListener struct {
 	logger           *zap.SugaredLogger
@@ -167,17 +171,6 @@ func (c *clientListener) NewBlockAvailable(kapi *cryptixApi, soloMining bool) {
 					sendClientDiff(client, varDiff)
 				}
 				c.shareHandler.startClientVardiff(client)
-			} else if client.IsSV2() {
-				if err := sendSV2Target(client, varDiff); err != nil {
-					if errors.Is(err, gostratum.ErrorDisconnected) {
-						RecordWorkerError(client.WalletAddr, ErrDisconnected)
-						return
-					}
-					RecordWorkerError(client.WalletAddr, ErrFailedSetDiff)
-					client.Logger.Error(errors.Wrap(err, "failed sending sv2 difficulty target").Error())
-					client.Disconnect()
-					return
-				}
 			}
 
 			jobId := state.AddJob(template.Block)
@@ -273,5 +266,14 @@ func sendSV2Job(client *gostratum.StratumContext, jobID uint32, prePowHash []byt
 	// cryptis-miner resolves all-zero prevhash using the remembered NewMiningJob pre-pow hash.
 	var zeroPrevHash [32]byte
 	minNTime := uint32(timestampMs / 1000)
-	return writeSV2Frame(client, sv2ExtChannel, sv2MsgSetNewPrevHash, encodeSV2SetNewPrevHashPayload(client.SV2ChannelID(), jobID, zeroPrevHash, minNTime, nBits))
+	encodedNBits := sv2EncodeNBitsWithOptionalMsHint(client.RemoteApp, timestampMs, nBits)
+	return writeSV2Frame(client, sv2ExtChannel, sv2MsgSetNewPrevHash, encodeSV2SetNewPrevHashPayload(client.SV2ChannelID(), jobID, zeroPrevHash, minNTime, encodedNBits))
+}
+
+func sv2EncodeNBitsWithOptionalMsHint(remoteApp string, timestampMs uint64, nBits uint32) uint32 {
+	app := strings.ToLower(strings.TrimSpace(remoteApp))
+	if strings.Contains(app, "cryptis-miner") {
+		return sv2NTimeMsTag | (uint32(timestampMs%1000) & sv2NTimeMsMask)
+	}
+	return nBits
 }

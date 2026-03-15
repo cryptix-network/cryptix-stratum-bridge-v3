@@ -103,6 +103,7 @@ func (h *sv2Handler) HandleBinaryClient(ctx *gostratum.StratumContext, connectio
 
 			state := GetMiningState(ctx)
 			state.InitializeIfNeeded(ctx.RemoteApp, h.minShareDiff)
+			h.shareHandler.setClientVardiff(ctx, h.minShareDiff)
 			diff := state.GetStratumDiffValue()
 			if diff <= 0 {
 				diff = h.minShareDiff

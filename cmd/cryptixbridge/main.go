@@ -26,6 +26,7 @@ func main() {
 	cfg := cryptixstratum.BridgeConfig{
 		StratumV2Port:     ":5556",
 		StratumV2Fallback: false,
+		VarDiffRetarget:   10 * time.Second,
 	}
 	if err := yaml.Unmarshal(rawCfg, &cfg); err != nil {
 		log.Printf("failed parsing config file: %s", err)
@@ -51,6 +52,7 @@ func main() {
 	flag.BoolVar(&cfg.VarDiff, "vardiff", cfg.VarDiff, "true to enable auto-adjusting variable min diff")
 	flag.UintVar(&cfg.SharesPerMin, "sharespermin", cfg.SharesPerMin, "number of shares per minute the vardiff engine should target")
 	flag.BoolVar(&cfg.VarDiffStats, "vardiffstats", cfg.VarDiffStats, "include vardiff stats readout every 10s in log")
+	flag.DurationVar(&cfg.VarDiffRetarget, "vardiffretarget", cfg.VarDiffRetarget, "time between vardiff retarget evaluations, default `10s`")
 	flag.BoolVar(&cfg.SoloMining, "solo", cfg.SoloMining, "true to use network diff instead of stratum vardiff")
 	flag.UintVar(&cfg.ExtranonceSize, "extranonce", cfg.ExtranonceSize, "size in bytes of extranonce, default `0`")
 	flag.StringVar(&cfg.PromPort, "prom", cfg.PromPort, "address to serve prom stats, default `:2112`")
@@ -79,6 +81,7 @@ func main() {
 	log.Printf("\tvar diff:        %t", cfg.VarDiff)
 	log.Printf("\tshares per min:  %d", cfg.SharesPerMin)
 	log.Printf("\tvar diff stats:  %t", cfg.VarDiffStats)
+	log.Printf("\tvar diff tick:   %s", cfg.VarDiffRetarget)
 	log.Printf("\tsolo mining:  	 %t", cfg.SoloMining)
 	log.Printf("\tblock wait:      %s", cfg.BlockWaitTime)
 	log.Printf("\textranonce size: %d", cfg.ExtranonceSize)

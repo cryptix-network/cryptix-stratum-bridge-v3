@@ -14,7 +14,7 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-const version = "v1.2.1"
+const version = "v1.2.3"
 const minBlockWaitTime = 500 * time.Millisecond
 
 type BridgeConfig struct {
@@ -32,6 +32,7 @@ type BridgeConfig struct {
 	VarDiff           bool          `yaml:"var_diff"`
 	SharesPerMin      uint          `yaml:"shares_per_min"`
 	VarDiffStats      bool          `yaml:"var_diff_stats"`
+	VarDiffRetarget   time.Duration `yaml:"var_diff_retarget_time"`
 	ExtranonceSize    uint          `yaml:"extranonce_size"`
 	StratumV2Fallback bool          `yaml:"stratum_v2_fallback_to_v1"`
 }
@@ -145,7 +146,7 @@ func ListenAndServe(cfg BridgeConfig) error {
 	})
 
 	if cfg.VarDiff || cfg.SoloMining {
-		go shareHandler.startVardiffThread(cfg.SharesPerMin, cfg.VarDiffStats)
+		go shareHandler.startVardiffThread(cfg.SharesPerMin, cfg.VarDiffStats, cfg.VarDiffRetarget)
 	}
 
 	if cfg.PrintStats {

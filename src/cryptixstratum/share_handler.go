@@ -22,7 +22,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const varDiffThreadSleep = 10
+const defaultVarDiffRetargetInterval = 10 * time.Second
 
 type WorkStats struct {
 	BlocksFound        atomic.Int64
@@ -497,7 +497,7 @@ func stringifyHashrate(ghs float64) string {
 	return fmt.Sprintf("%0.2f%sH/s", hr, unitStrings[unitIdx])
 }
 
-func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool) error {
+func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool, retargetInterval time.Duration) error {
 	// 15 shares/min allows a ~95% confidence assumption of:
 	//   < 100% variation after 1m
 	//   < 50% variation after 3m
@@ -506,13 +506,19 @@ func (sh *shareHandler) startVardiffThread(expectedShareRate uint, logStats bool
 	//   < 10% variation after 1h
 	//   < 5% variation after 4h
 	var windows = [...]uint{1, 3, 10, 30, 60, 240, 0}
-	var tolerances = [...]float64{1, 0.5, 0.25, 0.15, 0.1, 0.05, 0.05}
+	var tolerances = [...]float64{0.5, 0.5, 0.25, 0.15, 0.1, 0.05, 0.05}
 	if expectedShareRate == 0 {
 		expectedShareRate = 1
 	}
+	if retargetInterval <= 0 {
+		retargetInterval = defaultVarDiffRetargetInterval
+	}
+	if retargetInterval < time.Second {
+		retargetInterval = time.Second
+	}
 
 	for {
-		time.Sleep(varDiffThreadSleep * time.Second)
+		time.Sleep(retargetInterval)
 		sh.statsLock.Lock()
 
 		stats := "\n=== vardiff ===================================================================\n\n"

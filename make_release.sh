@@ -2,7 +2,7 @@ CMD_PATH="../cmd/cryptixbridge"
 rm -rf release
 mkdir -p release
 cd release
-VERSION=1.1.7
+VERSION=1.2.3
 ARCHIVE="cpay_bridge-${VERSION}"
 OUTFILE="cpay_bridge"
 OUTDIR="cpay_bridge"
