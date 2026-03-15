@@ -12,12 +12,6 @@ Here is a lightfull Browser Interface:
 [Cryptix Stratum Browser](https://github.com/cryptix-network/cryptix-stratum-bridge-browser-monitor)
 ## Mining
 
-You can use SRB Miner, its supported for Cryptix and the Bridge/ Pools:
-[SRB Miner](https://github.com/doktor83/SRBMiner-Multi/releases)
-
-For local Node, http Node or Pool Mining you can use:
-[Cryptix-Miner](https://github.com/cryptix-network/cryptix-miner)
-
 
 ## Hive Setup
 [detailed instructions here](hive-setup.md) 
@@ -28,16 +22,6 @@ For local Node, http Node or Pool Mining you can use:
 Shares-based work allocation with miner-like periodic stat output:
 
 ![image](https://user-images.githubusercontent.com/59971111/191983487-479e19ec-a8cb-4edb-afc4-55a1165e79fc.png)
-
-
-
-Optional monitoring UI:
-
-https://github.com/Cryptix/cryptix-stratum-bridge/blob/main/monitoring-setup.md
-
-![image](https://user-images.githubusercontent.com/59971111/192025446-f20d74a5-f9e0-4290-b98b-9f56af8f23b4.png)
-
-![image](https://user-images.githubusercontent.com/59971111/191980688-2d0faf6b-d551-4880-a316-de2303cfeb7d.png)
 
 
 Prometheus API:
