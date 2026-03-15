@@ -2,9 +2,16 @@
 
 
 This is a lightweight daemon that allows mining to a local (or remote)
-cryptix node using stratum-base miners. It is up to the community to
-build a stratum based miner, the original built-in miner is using gRPC
-interface.
+cryptix node using stratum-base miners.
+
+
+## Mining Software
+
+Supported Mining Software:
+
+Nvidia,Intel, AMD: https://github.com/cryptix-network/cryptis-miner
+
+Nvidia: https://github.com/OneZeroMiner/onezerominer
 
 ## Browser Interface
 Here is a lightfull Browser Interface:
